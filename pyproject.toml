@@ -1,0 +1,11 @@
+[project]
+name = "visionarcade"
+version = "0.1.0"
+description = "A completely touchless, computer-vision-controlled arcade."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "hardware: requires a real, physically connected camera or display and is skipped by default in CI",
+]

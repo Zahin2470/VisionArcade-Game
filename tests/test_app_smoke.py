@@ -1,0 +1,59 @@
+"""End-to-end smoke test for `VisionArcadeApp`.
+
+This deliberately does NOT mock the camera — in this headless test
+environment there is no real webcam, so `CameraService.open()` returns
+False naturally. That's exactly the "no camera available" path the
+project's error-handling requirements call for, so exercising it for
+real (rather than mocking a success) is the more valuable test here.
+"""
+
+from __future__ import annotations
+
+from visionarcade.app import VisionArcadeApp
+from visionarcade.config import AppConfig
+
+
+def test_app_runs_bounded_loop_without_camera_or_crashing():
+    config = AppConfig(window_width=320, window_height=240, debug=True)
+    app = VisionArcadeApp(config)
+
+    app.run(max_frames=5)  # must return normally, not hang or raise
+
+    assert app.renderer.is_open is False  # shutdown() closed everything
+    assert app.camera.is_open is False
+
+
+def test_app_start_is_idempotent():
+    config = AppConfig(window_width=320, window_height=240)
+    app = VisionArcadeApp(config)
+    app.start()
+    app.start()  # should not reopen or raise
+    assert app.renderer.is_open is True
+    app.shutdown()
+
+
+def test_app_shutdown_before_start_does_not_raise():
+    config = AppConfig(window_width=320, window_height=240)
+    app = VisionArcadeApp(config)
+    app.shutdown()  # nothing was ever opened; must be a safe no-op
+
+
+def test_app_runs_in_simulate_mode_without_a_camera_or_tracker():
+    config = AppConfig(window_width=320, window_height=240, debug=True, simulate=True)
+    app = VisionArcadeApp(config)
+
+    assert app.camera is None
+    assert app.tracker is None
+    assert app.simulator is not None
+
+    app.run(max_frames=10)  # must produce FrameIntents from the simulator alone
+
+    assert app.latest_intent is not None
+    assert app.renderer.is_open is False
+
+
+def test_simulate_mode_reports_the_default_right_hand_as_present_eventually():
+    config = AppConfig(window_width=320, window_height=240, simulate=True)
+    app = VisionArcadeApp(config)
+    app.run(max_frames=10)  # a few frames beyond the presence-confirmation delay
+    assert app.latest_intent.right.present is True
