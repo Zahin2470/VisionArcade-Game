@@ -9,7 +9,10 @@ real (rather than mocking a success) is the more valuable test here.
 
 from __future__ import annotations
 
+import pygame
+
 from visionarcade.app import VisionArcadeApp
+from visionarcade.arcade.state import ArcadeState
 from visionarcade.config import AppConfig
 
 
@@ -57,3 +60,41 @@ def test_simulate_mode_reports_the_default_right_hand_as_present_eventually():
     app = VisionArcadeApp(config)
     app.run(max_frames=10)  # a few frames beyond the presence-confirmation delay
     assert app.latest_intent.right.present is True
+
+
+def test_app_starts_on_home_screen(tmp_path, monkeypatch):
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=320, window_height=240)
+    app = VisionArcadeApp(config)
+    app.start()
+    assert app.arcade_manager.state == ArcadeState.HOME
+    app.shutdown()
+
+
+def test_keyboard_navigation_reaches_quit_end_to_end(tmp_path, monkeypatch):
+    # Redirect persistence so this doesn't touch the real user data dir.
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=320, window_height=240)
+    app = VisionArcadeApp(config)
+    app.start()
+
+    # Enough RIGHT presses to reach the Quit button (the last hub item),
+    # then Enter to activate it — all queued before the single frame
+    # that processes them, exercising the real event -> FocusGroup ->
+    # ArcadeManager path with nothing mocked.
+    item_count = len(app.arcade_manager.home_screen._focus.items)
+    for _ in range(item_count - 1):
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT))
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+
+    app.run(max_frames=1)
+
+    assert app.arcade_manager.should_quit is True

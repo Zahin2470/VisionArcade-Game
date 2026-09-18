@@ -11,7 +11,7 @@ it.
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import pygame
 
@@ -76,19 +76,24 @@ class Renderer:
         self._is_open = True
         logger.info("Renderer opened at %dx%d.", self.width, self.height)
 
-    def pump_events(self) -> bool:
-        """Process the OS event queue.
+    def pump_events(self) -> Tuple[bool, List[int]]:
+        """Process the OS event queue for this frame.
 
-        Returns False if the player requested to quit (window close or
-        Escape key), True otherwise. Callers should stop their main loop
-        promptly when this returns False.
+        Returns `(running, keydown_keys)`: `running` is False only when
+        the player closes the window — with real menus now in place,
+        pressing Escape is no longer a global "quit", since each screen
+        needs to interpret it contextually (e.g. "back" out of Settings
+        rather than exiting the whole app). `keydown_keys` lists every
+        key pressed this frame, in order, for callers to handle.
         """
+        keydown_keys: List[int] = []
+        running = True
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return False
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-                return False
-        return True
+                running = False
+            elif event.type == pygame.KEYDOWN:
+                keydown_keys.append(event.key)
+        return running, keydown_keys
 
     def clear(self, color: tuple[int, int, int] = BACKGROUND_COLOR) -> None:
         """Fill the whole surface with a solid color."""

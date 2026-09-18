@@ -1,30 +1,36 @@
 """Application entry point and main loop.
 
-Phase 2 wires the vision pipeline together end to end:
+Phase 3 wires the full arcade shell in:
 
-    camera/simulator -> tracker -> IntentBuilder -> FrameIntent
+    camera/simulator -> tracker -> IntentBuilder -> FrameIntent -> ArcadeManager
 
-`run()` accepts an optional `max_frames` so tests can drive a real
-(non-mocked) instance deterministically without a human closing the
-window. The arcade hub, games, audio, and persistence still arrive in
-later phases — for now the placeholder screen also shows the live
-intent state in debug mode, which is enough to manually verify the
-whole pipeline with a keyboard-controlled simulated hand.
+`ArcadeManager` owns the home hub, settings, and calibration screens,
+plus the settings/scores/profile persisted on disk and the audio
+manager. `run()` still accepts an optional `max_frames` so tests can
+drive a real (non-mocked) instance deterministically without a human
+closing the window.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Optional, Sequence
+from typing import List, Optional, Sequence
 
+import cv2
 import pygame
 
+from visionarcade.arcade.manager import ArcadeManager
+from visionarcade.audio.manager import AudioManager
 from visionarcade.config import AppConfig, config_from_args
 from visionarcade.constants import APP_NAME
+from visionarcade.persistence.profiles import load_profile
+from visionarcade.persistence.scores import load_scores
+from visionarcade.persistence.settings import load_settings
 from visionarcade.rendering.renderer import Renderer
 from visionarcade.vision.calibration import load_calibration
 from visionarcade.vision.camera import CameraService
 from visionarcade.vision.gestures import FrameIntent, IntentBuilder
+from visionarcade.vision.landmarks import HandResult
 from visionarcade.vision.simulation import SimulatedHandInputSource
 from visionarcade.vision.tracker import HandTracker
 
@@ -43,8 +49,8 @@ def configure_logging(debug: bool) -> None:
 
 
 class VisionArcadeApp:
-    """Owns the top-level renderer, input source, and intent pipeline
-    for one run of the application."""
+    """Owns the top-level renderer, input source, intent pipeline, and
+    the arcade shell for one run of the application."""
 
     def __init__(self, config: AppConfig) -> None:
         self.config = config
@@ -62,9 +68,15 @@ class VisionArcadeApp:
             SimulatedHandInputSource() if config.simulate else None
         )
 
-        self.intent_builder = IntentBuilder(calibration=load_calibration())
+        self.settings = load_settings()
+        self.scores = load_scores()
+        self.profile = load_profile()
+        self.calibration = load_calibration()
+
+        self.intent_builder = IntentBuilder(calibration=self.calibration)
         self.latest_intent: Optional[FrameIntent] = None
 
+        self.arcade_manager: Optional[ArcadeManager] = None
         self._camera_available = False
         self._started = False
         self._clock: Optional[pygame.time.Clock] = None
@@ -75,11 +87,22 @@ class VisionArcadeApp:
             self.simulator.set_hand("Right", present=True, position=(0.5, 0.5))
 
     def start(self) -> None:
-        """Open the window and, unless simulating, attempt the camera."""
+        """Open the window, build the arcade shell, and (unless
+        simulating) attempt the camera."""
         if self._started:
             return
         self.renderer.open()
         self._clock = pygame.time.Clock()
+
+        self.arcade_manager = ArcadeManager(
+            width=self.config.window_width,
+            height=self.config.window_height,
+            settings=self.settings,
+            scores=self.scores,
+            profile=self.profile,
+            calibration=self.calibration,
+            audio=AudioManager(),
+        )
 
         if self.camera is not None:
             self._camera_available = self.camera.open()
@@ -105,7 +128,8 @@ class VisionArcadeApp:
 
         If `max_frames` is given, the loop exits after that many frames
         regardless of window events — used by smoke tests. Otherwise it
-        runs until the player closes the window or presses Escape.
+        runs until the player closes the window, or activates Quit
+        from the home screen.
         """
         self.start()
         frame_count = 0
@@ -113,34 +137,43 @@ class VisionArcadeApp:
             running = True
             while running:
                 dt = self._clock.tick(self.config.fps_target) / 1000.0
-                running = self.renderer.pump_events()
+                window_open, key_events = self.renderer.pump_events()
 
                 hand_results = self._collect_hand_results(dt)
                 self.latest_intent = self.intent_builder.update(hand_results, dt)
+                self.arcade_manager.update(self.latest_intent, hand_results, key_events, dt)
 
                 self._render_frame()
 
+                running = window_open and not self.arcade_manager.should_quit
                 frame_count += 1
                 if max_frames is not None and frame_count >= max_frames:
                     break
         finally:
             self.shutdown()
 
-    def _collect_hand_results(self, dt: float):
+    def _collect_hand_results(self, dt: float) -> List[HandResult]:
         if self.simulator is not None:
             self._apply_simulated_keyboard_input(dt)
             return self.simulator.get_hand_results()
 
         frame = self.camera.read_frame() if self._camera_available else None
-        if frame is not None and self.tracker is not None:
-            return self.tracker.process(frame)
-        return []
+        if frame is None or self.tracker is None:
+            return []
+
+        if self.arcade_manager is not None and self.arcade_manager.settings.camera_mirror:
+            frame = cv2.flip(frame, 1)  # horizontal flip: feels like a mirror to the player
+
+        return self.tracker.process(frame)
 
     def _apply_simulated_keyboard_input(self, dt: float) -> None:
         """Let the developer drive the simulated hand from the keyboard,
-        so the whole vision->intent pipeline can be exercised by hand
-        without a camera (Developer Mode's "simulate hand positions"
-        and "simulate pinch/swipe gestures")."""
+        so the whole vision->intent->arcade pipeline can be exercised by
+        hand without a camera (Developer Mode's "simulate hand
+        positions" and "simulate pinch/swipe gestures"). Note: the same
+        arrow keys also move menu focus via the discrete keydown events
+        `ArcadeManager` receives — both are intentional for a developer
+        tool, if a little redundant."""
         assert self.simulator is not None
         keys = pygame.key.get_pressed()
 
@@ -160,16 +193,7 @@ class VisionArcadeApp:
         self.simulator.set_pinch("Right", bool(keys[pygame.K_SPACE]))
 
     def _render_frame(self) -> None:
-        self.renderer.clear()
-
-        if self.simulator is not None:
-            status = "simulated hand (dev mode)"
-        elif self._camera_available:
-            status = "camera: live"
-        else:
-            status = "camera: unavailable"
-
-        self.renderer.draw_placeholder_text(f"{APP_NAME} — Phase 2 skeleton  ({status})")
+        self.arcade_manager.draw(self.renderer.surface)
 
         if self.config.debug and self.latest_intent is not None:
             self._draw_debug_intent_text(self.latest_intent)
@@ -177,9 +201,6 @@ class VisionArcadeApp:
         self.renderer.present()
 
     def _draw_debug_intent_text(self, intent: FrameIntent) -> None:
-        # A plain-text stand-in for the real debug overlay `rendering/hud.py`
-        # will provide once the arcade hub exists — good enough to confirm
-        # the intent pipeline is producing sane values frame to frame.
         hand = intent.primary()
         if not hand.present:
             line = "hand: not detected"
@@ -190,11 +211,13 @@ class VisionArcadeApp:
                 f"pinch={hand.pinch_state.value} openness={hand.openness:.2f} "
                 f"fist={hand.is_fist} swipe={hand.swipe}"
             )
-        debug_center = (self.renderer.width // 2, self.renderer.height // 2 + 40)
+        debug_center = (self.renderer.width // 2, self.renderer.height - 16)
         self.renderer.draw_placeholder_text(line, color=(120, 220, 160), center=debug_center)
 
     def shutdown(self) -> None:
-        """Release the camera, tracker, and window, in that order."""
+        """Persist state and release the camera, tracker, and window."""
+        if self.arcade_manager is not None:
+            self.arcade_manager.shutdown()
         if self.camera is not None:
             self.camera.close()
         if self.tracker is not None:

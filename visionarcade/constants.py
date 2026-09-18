@@ -81,3 +81,62 @@ CALIBRATION_DEFAULT_Y_MIN: float = 0.2
 CALIBRATION_DEFAULT_Y_MAX: float = 0.8
 CALIBRATION_MOVE_PHASE_SECONDS: float = 4.0
 CALIBRATION_STEP_HOLD_SECONDS: float = 1.0
+
+# --- Themes / settings (Phase 3) ---------------------------------------------
+THEMES: tuple[str, ...] = ("dark", "light", "neon", "mono")
+DEFAULT_THEME: str = "dark"
+
+MIN_VOLUME: float = 0.0
+MAX_VOLUME: float = 1.0
+DEFAULT_MASTER_VOLUME: float = 1.0
+DEFAULT_SFX_VOLUME: float = 1.0
+DEFAULT_MUSIC_VOLUME: float = 0.6
+
+SENSITIVITY_MIN: float = 0.5
+SENSITIVITY_MAX: float = 2.0
+DEFAULT_SENSITIVITY: float = 1.0
+
+SMOOTHING_MULTIPLIER_MIN: float = 0.5
+SMOOTHING_MULTIPLIER_MAX: float = 2.0
+DEFAULT_SMOOTHING_MULTIPLIER: float = 1.0
+
+DEFAULT_PLAYER_DISPLAY_NAME: str = "Player"
+DISPLAY_NAME_MAX_LENGTH: int = 24
+
+MAX_SCORE_HISTORY_PER_GAME: int = 50
+
+# --- Arcade hub layout / metadata (Phase 3) ----------------------------------
+GAME_CARD_WIDTH: int = 220
+GAME_CARD_HEIGHT: int = 260
+GAME_CARD_GAP: int = 28
+FOCUS_BORDER_WIDTH: int = 3
+
+#: Static per-game metadata used by the hub before each game ships its
+#: own richer description — keeps display strings out of UI code.
+GAME_METADATA: dict = {
+    "catch": {
+        "title": "Vision Catch",
+        "description": "Move a hand-controlled catcher to collect falling objects.",
+        "difficulty": "Easy",
+    },
+    "pong": {
+        "title": "Vision Pong",
+        "description": "Control a paddle with your hand and rally the ball.",
+        "difficulty": "Medium",
+    },
+    "slice": {
+        "title": "Vision Slice",
+        "description": "Swipe through moving targets with your hand's trajectory.",
+        "difficulty": "Medium",
+    },
+    "aim": {
+        "title": "Vision Aim",
+        "description": "Point at targets and pinch to activate them.",
+        "difficulty": "Hard",
+    },
+    "puzzle": {
+        "title": "Vision Puzzle",
+        "description": "Touchless spatial puzzle: pinch, move, and place pieces.",
+        "difficulty": "Hard",
+    },
+}

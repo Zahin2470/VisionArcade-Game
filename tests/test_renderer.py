@@ -41,19 +41,35 @@ def test_draw_placeholder_text_does_not_raise(renderer):
 
 def test_pump_events_true_with_no_events(renderer):
     pygame.event.clear()
-    assert renderer.pump_events() is True
+    running, keys = renderer.pump_events()
+    assert running is True
+    assert keys == []
 
 
 def test_pump_events_false_on_quit_event(renderer):
     pygame.event.clear()
     pygame.event.post(pygame.event.Event(pygame.QUIT))
-    assert renderer.pump_events() is False
+    running, keys = renderer.pump_events()
+    assert running is False
 
 
-def test_pump_events_false_on_escape_key(renderer):
+def test_pump_events_reports_keydown_but_escape_no_longer_quits(renderer):
+    # With real menus now in place, each screen interprets Escape itself
+    # (e.g. "back"); the renderer must not treat it as a global quit.
     pygame.event.clear()
     pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
-    assert renderer.pump_events() is False
+    running, keys = renderer.pump_events()
+    assert running is True
+    assert pygame.K_ESCAPE in keys
+
+
+def test_pump_events_collects_multiple_keydowns_in_order(renderer):
+    pygame.event.clear()
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_LEFT))
+    pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+    running, keys = renderer.pump_events()
+    assert running is True
+    assert keys == [pygame.K_LEFT, pygame.K_RETURN]
 
 
 def test_close_is_idempotent(renderer):

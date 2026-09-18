@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from visionarcade.utils.paths import get_asset_dir, get_package_root, get_user_data_dir
 
 
