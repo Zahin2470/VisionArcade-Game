@@ -10,6 +10,7 @@ from __future__ import annotations
 import pygame
 import pytest
 
+from visionarcade.arcade.games.catch import _Phase as _CatchPhase
 from visionarcade.arcade.manager import ArcadeManager
 from visionarcade.arcade.state import ArcadeState
 from visionarcade.config import KNOWN_GAMES
@@ -195,3 +196,143 @@ def test_draw_does_not_raise_in_every_state(renderer):
         manager.state = state
         manager.active_game_id = KNOWN_GAMES[0]
         manager.draw(renderer.surface)
+
+
+# --- Real gameplay: catch, pause, results (Phase 4) ---------------------------
+
+def test_selecting_catch_instantiates_a_real_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    assert manager.active_game is not None
+    assert manager.active_game.id == "catch"
+    assert manager.state == ArcadeState.PLAYING
+
+
+def test_selecting_an_unimplemented_game_still_uses_the_placeholder(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("pong")
+    assert manager.active_game is None
+    assert manager.state == ArcadeState.PLAYING
+
+
+def test_escape_during_real_gameplay_pauses_instead_of_returning_home(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.PAUSED
+    assert manager.active_game is not None  # game is frozen, not discarded
+
+
+def test_resume_from_pause_returns_to_playing_with_same_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    game_before = manager.active_game
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)  # Resume is focused by default
+    assert manager.state == ArcadeState.PLAYING
+    assert manager.active_game is game_before
+
+
+def test_restart_from_pause_gives_a_fresh_game_instance(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._score.add(500)  # dirty the state
+    game_before = manager.active_game
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)  # focus Restart
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.state == ArcadeState.PLAYING
+    assert manager.active_game is not game_before
+    assert manager.active_game._score.score == 0
+
+
+def test_quit_to_hub_from_pause_records_partial_score(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._score.add(77)
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)  # focus Quit to Hub
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.state == ArcadeState.HOME
+    assert manager.active_game is None
+    assert manager.scores.best_score("catch") == 77
+
+
+def test_finishing_a_round_transitions_to_results_and_saves_score(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._phase = _CatchPhase.PLAYING
+    manager.active_game._lives = 0
+    manager.active_game._objects = []
+    manager.update(_empty_intent(), [], [], DT)  # triggers game-over inside update()
+
+    assert manager.state == ArcadeState.RESULTS
+    assert manager.scores.best_score("catch") is not None
+    assert manager.profile.total_games_played == 1
+
+
+def test_play_again_from_results_starts_a_fresh_round(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._phase = _CatchPhase.PLAYING
+    manager.active_game._lives = 0
+    manager.active_game._objects = []
+    manager.update(_empty_intent(), [], [], DT)  # -> RESULTS
+    assert manager.state == ArcadeState.RESULTS
+
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)  # Play Again is focused by default
+    assert manager.state == ArcadeState.PLAYING
+    assert manager.active_game is not None
+    assert manager.active_game.is_finished() is False
+
+
+def test_back_to_hub_from_results(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._phase = _CatchPhase.PLAYING
+    manager.active_game._lives = 0
+    manager.active_game._objects = []
+    manager.update(_empty_intent(), [], [], DT)  # -> RESULTS
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.HOME
+    assert manager.active_game is None
+
+
+def test_shutdown_during_active_playing_records_progress(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._score.add(33)
+    manager.shutdown()
+
+    from visionarcade.persistence.scores import load_scores
+
+    assert load_scores().best_score("catch") == 33
+
+
+def test_draw_does_not_raise_while_paused_or_in_results(renderer, isolated_user_data_dir):
+    manager = ArcadeManager(
+        width=renderer.surface.get_width(),
+        height=renderer.surface.get_height(),
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    manager._start_game("catch")
+    manager.draw(renderer.surface)
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    manager.draw(renderer.surface)  # PAUSED
+
+    manager.active_game._phase = _CatchPhase.PLAYING
+    manager.active_game._lives = 0
+    manager.state = ArcadeState.PLAYING
+    manager.active_game._objects = []
+    manager.update(_empty_intent(), [], [], DT)
+    manager.draw(renderer.surface)  # RESULTS

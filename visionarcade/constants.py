@@ -140,3 +140,34 @@ GAME_METADATA: dict = {
         "difficulty": "Hard",
     },
 }
+
+# --- Vision Catch tuning (Phase 4) -------------------------------------------
+CATCH_START_LIVES: int = 3
+CATCH_ROUND_DURATION_SECONDS: float = 90.0
+CATCH_COUNTDOWN_SECONDS: float = 3.0
+CATCH_DIFFICULTY_RAMP_SECONDS: float = 60.0
+
+CATCH_CATCHER_WIDTH: int = 130
+CATCH_CATCHER_HEIGHT: int = 26
+CATCH_OBJECT_RADIUS: float = 16.0
+
+CATCH_FALL_SPEED_START: float = 140.0  # px/sec
+CATCH_FALL_SPEED_END: float = 340.0  # px/sec
+CATCH_SPAWN_INTERVAL_START: float = 1.1  # seconds between spawns
+CATCH_SPAWN_INTERVAL_END: float = 0.45
+
+CATCH_GOOD_WEIGHT: float = 70.0
+CATCH_HAZARD_WEIGHT: float = 25.0
+CATCH_BONUS_WEIGHT: float = 5.0
+
+CATCH_GOOD_POINTS: int = 10
+CATCH_BONUS_POINTS: int = 50
+CATCH_NEAR_MISS_BONUS_POINTS: int = 5
+CATCH_NEAR_MISS_DISTANCE: float = 40.0  # px
+
+CATCH_COMBO_MAX_MULTIPLIER: float = 4.0
+CATCH_COMBO_MULTIPLIER_STEP: float = 0.5
+CATCH_COMBO_TIMEOUT_SECONDS: float = 2.5
+
+CATCH_SCREEN_SHAKE_DURATION: float = 0.25
+CATCH_SCREEN_SHAKE_MAGNITUDE: float = 8.0  # px

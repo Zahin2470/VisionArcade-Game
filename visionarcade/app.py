@@ -124,33 +124,48 @@ class VisionArcadeApp:
         self._started = True
 
     def run(self, max_frames: Optional[int] = None) -> None:
-        """Run the main loop.
+        """Run the main loop until the player quits, then shut down.
 
         If `max_frames` is given, the loop exits after that many frames
-        regardless of window events — used by smoke tests. Otherwise it
-        runs until the player closes the window, or activates Quit
-        from the home screen.
+        regardless of window events — used by smoke tests that want a
+        single self-contained call. For tests that need to step the
+        app frame-by-frame while keeping it alive between steps (e.g.
+        to manipulate game state mid-round), call `start()` once, then
+        `step()` repeatedly, then `shutdown()` — see `step()`.
         """
         self.start()
         frame_count = 0
         try:
             running = True
             while running:
-                dt = self._clock.tick(self.config.fps_target) / 1000.0
-                window_open, key_events = self.renderer.pump_events()
-
-                hand_results = self._collect_hand_results(dt)
-                self.latest_intent = self.intent_builder.update(hand_results, dt)
-                self.arcade_manager.update(self.latest_intent, hand_results, key_events, dt)
-
-                self._render_frame()
-
-                running = window_open and not self.arcade_manager.should_quit
+                running = self.step()
                 frame_count += 1
                 if max_frames is not None and frame_count >= max_frames:
                     break
         finally:
             self.shutdown()
+
+    def step(self) -> bool:
+        """Advance the app by exactly one frame.
+
+        Does not call `start()` or `shutdown()` — callers that want a
+        fully self-contained single call should use `run()` instead.
+        `step()` exists so tests can drive several frames in a row
+        (with real state manipulation in between) without tearing down
+        and reopening pygame's display each time, the way repeated
+        `run(max_frames=1)` calls otherwise would via `run()`'s cleanup.
+        Returns whether the app should keep running.
+        """
+        dt = self._clock.tick(self.config.fps_target) / 1000.0
+        window_open, key_events = self.renderer.pump_events()
+
+        hand_results = self._collect_hand_results(dt)
+        self.latest_intent = self.intent_builder.update(hand_results, dt)
+        self.arcade_manager.update(self.latest_intent, hand_results, key_events, dt)
+
+        self._render_frame()
+
+        return window_open and not self.arcade_manager.should_quit
 
     def _collect_hand_results(self, dt: float) -> List[HandResult]:
         if self.simulator is not None:

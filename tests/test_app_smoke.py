@@ -98,3 +98,49 @@ def test_keyboard_navigation_reaches_quit_end_to_end(tmp_path, monkeypatch):
     app.run(max_frames=1)
 
     assert app.arcade_manager.should_quit is True
+
+
+def test_simulate_mode_plays_a_real_round_of_catch_end_to_end(tmp_path, monkeypatch):
+    """Drive the actual app (simulated hand, no camera) from the home
+    screen into a real game of Vision Catch, catch a real falling
+    object, and pause/resume — nothing mocked below the OS event
+    queue."""
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=640, window_height=480, simulate=True)
+    app = VisionArcadeApp(config)
+    app.start()
+
+    try:
+        # Let the simulated hand register as present, then select Vision
+        # Catch's card (the first item in the hub).
+        for _ in range(5):
+            app.step()
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        app.step()
+        assert app.arcade_manager.active_game is not None
+        assert app.arcade_manager.active_game.id == "catch"
+
+        # Fast-forward through the countdown, then force a catchable
+        # object right on top of the catcher and let one real frame
+        # resolve it.
+        from visionarcade.arcade.games.catch import _FallingObject, _Phase
+
+        game = app.arcade_manager.active_game
+        game._phase = _Phase.PLAYING
+        game._objects = [_FallingObject(x=game._catcher_x, y=game._catcher_rect().centery, kind="good")]
+        app.step()
+        assert game._score.score > 0
+
+        # Pause, then resume, via the real keyboard path.
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        app.step()
+        assert app.arcade_manager.state.value == "paused"
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        app.step()
+        assert app.arcade_manager.state.value == "playing"
+    finally:
+        app.shutdown()
