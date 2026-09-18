@@ -210,7 +210,7 @@ def test_selecting_catch_instantiates_a_real_game(isolated_user_data_dir):
 
 def test_selecting_an_unimplemented_game_still_uses_the_placeholder(isolated_user_data_dir):
     manager = _manager()
-    manager._start_game("pong")
+    manager._start_game("slice")
     assert manager.active_game is None
     assert manager.state == ArcadeState.PLAYING
 
@@ -336,3 +336,68 @@ def test_draw_does_not_raise_while_paused_or_in_results(renderer, isolated_user_
     manager.active_game._objects = []
     manager.update(_empty_intent(), [], [], DT)
     manager.draw(renderer.surface)  # RESULTS
+
+
+# --- Pong is registered like any other game (Phase 5) --------------------------
+
+def test_selecting_pong_instantiates_a_real_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("pong")
+    assert manager.active_game is not None
+    assert manager.active_game.id == "pong"
+    assert manager.state == ArcadeState.PLAYING
+
+
+def test_pong_pauses_like_any_other_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("pong")
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.PAUSED
+    assert manager.active_game is not None
+
+
+def test_pong_quit_to_hub_from_pause_records_score(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("pong")
+    manager.active_game._right_score = 4
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)  # focus Quit to Hub
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.state == ArcadeState.HOME
+    assert manager.scores.best_score("pong") == 4
+
+
+def test_pong_finishing_a_match_transitions_to_results(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("pong")
+    from visionarcade.arcade.games.pong import PongMode
+    from visionarcade.arcade.games.pong import _Phase as _PongPhase
+
+    manager.active_game._mode = PongMode.SINGLE_PLAYER
+    manager.active_game._phase = _PongPhase.PLAYING
+    manager.active_game._right_score = manager.active_game._points_to_win - 1
+    manager.active_game._serve_timer = 0.0
+    manager.active_game._ball_x = manager.active_game.play_area.left - 100
+    manager.update(_empty_intent(), [], [], DT)
+
+    assert manager.state == ArcadeState.RESULTS
+    assert manager.scores.best_score("pong") is not None
+    assert manager.profile.total_games_played == 1
+
+
+def test_draw_does_not_raise_for_pong_in_every_state(renderer, isolated_user_data_dir):
+    manager = ArcadeManager(
+        width=renderer.surface.get_width(),
+        height=renderer.surface.get_height(),
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    manager._start_game("pong")
+    manager.draw(renderer.surface)  # PLAYING (mode select sub-screen)
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    manager.draw(renderer.surface)  # PAUSED

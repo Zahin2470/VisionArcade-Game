@@ -171,3 +171,25 @@ CATCH_COMBO_TIMEOUT_SECONDS: float = 2.5
 
 CATCH_SCREEN_SHAKE_DURATION: float = 0.25
 CATCH_SCREEN_SHAKE_MAGNITUDE: float = 8.0  # px
+
+# --- Vision Pong tuning (Phase 5) --------------------------------------------
+PONG_POINTS_TO_WIN: int = 7
+PONG_COUNTDOWN_SECONDS: float = 3.0
+PONG_SERVE_DELAY_SECONDS: float = 0.8
+PONG_DIFFICULTY_RAMP_SECONDS: float = 60.0
+
+PONG_PADDLE_WIDTH: int = 18
+PONG_PADDLE_HEIGHT: int = 110
+PONG_PADDLE_MARGIN: int = 30  # distance from the play area's left/right edge
+
+PONG_BALL_RADIUS: float = 10.0
+PONG_BALL_SPEED_START: float = 260.0  # px/sec
+PONG_BALL_SPEED_END: float = 480.0
+PONG_BALL_MAX_SPEED: float = 700.0  # absolute cap regardless of ramp + hit speedup
+PONG_BALL_HIT_SPEEDUP: float = 1.05  # multiplicative speed boost per paddle hit
+
+PONG_BOUNCE_MAX_ANGLE_SPEED: float = 340.0  # px/sec of vertical "english" from an edge hit
+
+PONG_AI_SPEED_START: float = 220.0  # px/sec, AI paddle chase speed early on
+PONG_AI_SPEED_END: float = 420.0  # AI gets tougher as the round goes on
+PONG_AI_REACTION_ERROR: float = 18.0  # px of random aim error, so the AI is beatable

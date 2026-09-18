@@ -33,14 +33,20 @@ class GameInput:
     velocity: Point  # normalized units/second, same convention as HandIntent.velocity
 
 
+def map_point_to_rect(point: Optional[Point], rect: pygame.Rect) -> Optional[Point]:
+    """Map a normalized [0, 1] point into `rect`'s pixel space, or None
+    if `point` is None. Shared by `build_game_input` (for the primary
+    hand) and directly by two-hand games like Pong, which need to map
+    each hand's position independently rather than just the primary one."""
+    if point is None:
+        return None
+    return (rect.x + point[0] * rect.width, rect.y + point[1] * rect.height)
+
+
 def build_game_input(intent: FrameIntent, play_area: pygame.Rect) -> GameInput:
     """Map the primary hand's intent into `play_area`'s pixel space."""
     hand = intent.primary()
-    pointer: Optional[Point] = None
-    if hand.present and hand.position is not None:
-        x = play_area.x + hand.position[0] * play_area.width
-        y = play_area.y + hand.position[1] * play_area.height
-        pointer = (x, y)
+    pointer = map_point_to_rect(hand.position, play_area) if hand.present else None
 
     return GameInput(
         pointer=pointer,

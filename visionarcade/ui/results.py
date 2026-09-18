@@ -22,6 +22,10 @@ _LABELS = (("play_again", "Play Again"), ("back_to_hub", "Back to Hub"))
 _OUTCOME_HEADLINES = {
     "cleared": "Round Complete!",
     "out_of_lives": "Game Over",
+    "player_win": "You Win!",
+    "player_loss": "You Lose",
+    "left_win": "Left Player Wins!",
+    "right_win": "Right Player Wins!",
 }
 
 

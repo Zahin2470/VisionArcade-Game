@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pygame
 
-from visionarcade.arcade.input import build_game_input
+from visionarcade.arcade.input import build_game_input, map_point_to_rect
 from visionarcade.vision.gestures import FrameIntent, HandIntent, PinchState
 from visionarcade.vision.motion import SwipeDirection
 
@@ -82,3 +82,20 @@ def test_falls_back_to_left_hand_when_right_absent():
     play_area = pygame.Rect(0, 0, 100, 100)
     game_input = build_game_input(intent, play_area)
     assert game_input.pointer == (25.0, 25.0)
+
+
+# --- map_point_to_rect (used directly by two-hand games like Pong) -----------
+
+def test_map_point_to_rect_none_returns_none():
+    assert map_point_to_rect(None, pygame.Rect(0, 0, 100, 100)) is None
+
+
+def test_map_point_to_rect_maps_into_pixel_space():
+    rect = pygame.Rect(50, 20, 200, 100)
+    assert map_point_to_rect((0.5, 0.5), rect) == (150.0, 70.0)
+
+
+def test_map_point_to_rect_origin_and_corner():
+    rect = pygame.Rect(10, 10, 100, 50)
+    assert map_point_to_rect((0.0, 0.0), rect) == (10.0, 10.0)
+    assert map_point_to_rect((1.0, 1.0), rect) == (110.0, 60.0)
