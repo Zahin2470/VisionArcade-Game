@@ -210,7 +210,7 @@ def test_selecting_catch_instantiates_a_real_game(isolated_user_data_dir):
 
 def test_selecting_an_unimplemented_game_still_uses_the_placeholder(isolated_user_data_dir):
     manager = _manager()
-    manager._start_game("slice")
+    manager._start_game("aim")
     assert manager.active_game is None
     assert manager.state == ArcadeState.PLAYING
 
@@ -399,5 +399,67 @@ def test_draw_does_not_raise_for_pong_in_every_state(renderer, isolated_user_dat
     )
     manager._start_game("pong")
     manager.draw(renderer.surface)  # PLAYING (mode select sub-screen)
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    manager.draw(renderer.surface)  # PAUSED
+
+
+# --- Slice is registered like any other game (Phase 6) --------------------------
+
+def test_selecting_slice_instantiates_a_real_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("slice")
+    assert manager.active_game is not None
+    assert manager.active_game.id == "slice"
+    assert manager.state == ArcadeState.PLAYING
+
+
+def test_slice_pauses_like_any_other_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("slice")
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.PAUSED
+    assert manager.active_game is not None
+
+
+def test_slice_quit_to_hub_from_pause_records_score(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("slice")
+    manager.active_game._score.add(88)
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)  # focus Quit to Hub
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.state == ArcadeState.HOME
+    assert manager.scores.best_score("slice") == 88
+
+
+def test_slice_finishing_a_round_transitions_to_results(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("slice")
+    from visionarcade.arcade.games.slice import _Phase as _SlicePhase
+
+    manager.active_game._phase = _SlicePhase.PLAYING
+    manager.active_game._lives = 0
+    manager.active_game._targets = []
+    manager.update(_empty_intent(), [], [], DT)
+
+    assert manager.state == ArcadeState.RESULTS
+    assert manager.scores.best_score("slice") is not None
+    assert manager.profile.total_games_played == 1
+
+
+def test_draw_does_not_raise_for_slice_in_every_state(renderer, isolated_user_data_dir):
+    manager = ArcadeManager(
+        width=renderer.surface.get_width(),
+        height=renderer.surface.get_height(),
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    manager._start_game("slice")
+    manager.draw(renderer.surface)  # PLAYING
     manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
     manager.draw(renderer.surface)  # PAUSED

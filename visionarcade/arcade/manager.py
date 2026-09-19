@@ -21,6 +21,7 @@ import pygame
 from visionarcade.arcade.game import ArcadeGame
 from visionarcade.arcade.games.catch import CatchGame
 from visionarcade.arcade.games.pong import PongGame
+from visionarcade.arcade.games.slice import SliceGame
 from visionarcade.arcade.state import ArcadeState
 from visionarcade.audio.effects import SoundEffects
 from visionarcade.audio.manager import AudioManager
@@ -50,6 +51,7 @@ GameFactory = Callable[[int, int, Theme, Typography], ArcadeGame]
 GAME_FACTORIES: Dict[str, GameFactory] = {
     "catch": lambda w, h, theme, typography: CatchGame(w, h, theme, typography),
     "pong": lambda w, h, theme, typography: PongGame(w, h, theme, typography),
+    "slice": lambda w, h, theme, typography: SliceGame(w, h, theme, typography),
 }
 
 

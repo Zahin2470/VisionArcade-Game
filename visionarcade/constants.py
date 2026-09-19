@@ -193,3 +193,33 @@ PONG_BOUNCE_MAX_ANGLE_SPEED: float = 340.0  # px/sec of vertical "english" from 
 PONG_AI_SPEED_START: float = 220.0  # px/sec, AI paddle chase speed early on
 PONG_AI_SPEED_END: float = 420.0  # AI gets tougher as the round goes on
 PONG_AI_REACTION_ERROR: float = 18.0  # px of random aim error, so the AI is beatable
+
+# --- Vision Slice tuning (Phase 6) -------------------------------------------
+SLICE_START_LIVES: int = 3
+SLICE_ROUND_DURATION_SECONDS: float = 75.0
+SLICE_COUNTDOWN_SECONDS: float = 3.0
+SLICE_DIFFICULTY_RAMP_SECONDS: float = 55.0
+
+SLICE_TARGET_RADIUS: float = 26.0
+SLICE_GRAVITY: float = 480.0  # px/sec^2, pulls arced targets back down
+
+SLICE_LAUNCH_SPEED_START: float = 520.0  # px/sec, initial launch speed magnitude
+SLICE_LAUNCH_SPEED_END: float = 720.0
+SLICE_SPAWN_INTERVAL_START: float = 1.0  # seconds between spawns
+SLICE_SPAWN_INTERVAL_END: float = 0.5
+
+SLICE_COMMON_WEIGHT: float = 65.0
+SLICE_GOLD_WEIGHT: float = 10.0
+SLICE_BOMB_WEIGHT: float = 25.0
+
+SLICE_COMMON_POINTS: int = 10
+SLICE_GOLD_POINTS: int = 50
+
+SLICE_CHAIN_MAX_MULTIPLIER: float = 5.0
+SLICE_CHAIN_MULTIPLIER_STEP: float = 0.5
+SLICE_CHAIN_TIMEOUT_SECONDS: float = 0.6
+
+SLICE_TRAIL_LENGTH: int = 14
+
+SLICE_SCREEN_SHAKE_DURATION: float = 0.25
+SLICE_SCREEN_SHAKE_MAGNITUDE: float = 9.0  # px

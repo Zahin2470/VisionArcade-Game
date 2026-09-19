@@ -146,7 +146,82 @@ def test_simulate_mode_plays_a_real_round_of_catch_end_to_end(tmp_path, monkeypa
         app.shutdown()
 
 
-def test_simulate_mode_plays_a_real_match_of_pong_end_to_end(tmp_path, monkeypatch):
+def test_simulate_mode_plays_a_real_round_of_slice_end_to_end(tmp_path, monkeypatch):
+    """Drive the actual app into Vision Slice and slice a real target
+    with a genuine two-frame swipe through the real intent pipeline —
+    nothing mocked below the OS event queue."""
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=640, window_height=480, simulate=True)
+    app = VisionArcadeApp(config)
+    app.start()
+    monkeypatch.setattr(app, "_apply_simulated_keyboard_input", lambda dt: None)
+
+    try:
+        # Select Vision Slice's card (third item in the hub).
+        for _ in range(5):
+            app.step()
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT))
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT))
+        app.step()
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        app.step()
+        game = app.arcade_manager.active_game
+        assert game is not None and game.id == "slice"
+
+        from visionarcade.arcade.games.slice import _Phase, _Target
+        from visionarcade.vision.calibration import CalibrationData
+
+        game._phase = _Phase.PLAYING
+        target = _Target(x=game.play_area.centerx, y=game.play_area.centery, vx=0, vy=0, kind="common")
+        game._targets = [target]
+        game._trail.clear()
+        game._previous_pointer = None
+
+        # A real swipe: move the simulated hand's raw position steadily
+        # across the target's location over many frames, since
+        # HandIntent.position is exponentially smoothed (see Phase 2) —
+        # it can't jump from one side to the other in a couple of
+        # frames the way the isolated unit tests (which construct
+        # HandIntent directly, bypassing smoothing) can afford to.
+        # Coordinates go through the default calibration's remap (same
+        # as the Pong end-to-end test) since the simulator feeds
+        # pre-calibration coordinates.
+        default_calibration = CalibrationData.default()
+
+        def to_raw(rel_x: float, rel_y: float):
+            raw_x = default_calibration.x_min + rel_x * (default_calibration.x_max - default_calibration.x_min)
+            raw_y = default_calibration.y_min + rel_y * (default_calibration.y_max - default_calibration.y_min)
+            return (raw_x, raw_y)
+
+        rel_x_left = (game.play_area.left + 5 - game.play_area.left) / game.play_area.width
+        rel_x_right = (game.play_area.right - 5 - game.play_area.left) / game.play_area.width
+        rel_y = (target.y - game.play_area.top) / game.play_area.height
+
+        steps = 40
+        for i in range(steps + 1):
+            fraction = i / steps
+            rel_x = rel_x_left + (rel_x_right - rel_x_left) * fraction
+            app.simulator.move_hand("Right", to_raw(rel_x, rel_y))
+            app.step()
+            # This test is about real swipe *detection* through the real
+            # smoothing/intent pipeline, not about tracking a target
+            # that's simultaneously falling under gravity (a separate,
+            # already-covered concern — see test_slice_game.py) — pin
+            # it in place against the one frame of gravity update() just
+            # applied, each iteration.
+            target.x, target.y = game.play_area.centerx, game.play_area.centery
+            target.vx, target.vy = 0.0, 0.0
+            if target.sliced:
+                break
+
+        assert target.sliced is True
+        assert game._score.score > 0
+    finally:
+        app.shutdown()
     """Drive the actual app into Vision Pong, pick 1-player mode via a
     real touchless pinch on the in-game menu, and win a point — nothing
     mocked below the OS event queue.
