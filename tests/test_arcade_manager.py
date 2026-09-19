@@ -210,7 +210,7 @@ def test_selecting_catch_instantiates_a_real_game(isolated_user_data_dir):
 
 def test_selecting_an_unimplemented_game_still_uses_the_placeholder(isolated_user_data_dir):
     manager = _manager()
-    manager._start_game("aim")
+    manager._start_game("puzzle")
     assert manager.active_game is None
     assert manager.state == ArcadeState.PLAYING
 
@@ -460,6 +460,69 @@ def test_draw_does_not_raise_for_slice_in_every_state(renderer, isolated_user_da
         calibration=CalibrationData.default(),
     )
     manager._start_game("slice")
+    manager.draw(renderer.surface)  # PLAYING
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    manager.draw(renderer.surface)  # PAUSED
+
+
+# --- Aim is registered like any other game (Phase 7) --------------------------
+
+def test_selecting_aim_instantiates_a_real_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("aim")
+    assert manager.active_game is not None
+    assert manager.active_game.id == "aim"
+    assert manager.state == ArcadeState.PLAYING
+
+
+def test_aim_pauses_like_any_other_game(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("aim")
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.PAUSED
+    assert manager.active_game is not None
+
+
+def test_aim_quit_to_hub_from_pause_records_score(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("aim")
+    manager.active_game._score.add(60)
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)  # -> PAUSED
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)
+    manager.update(_empty_intent(), [], [pygame.K_DOWN], DT)  # focus Quit to Hub
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.state == ArcadeState.HOME
+    assert manager.scores.best_score("aim") == 60
+
+
+def test_aim_finishing_a_round_transitions_to_results(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("aim")
+    from visionarcade.arcade.games.aim import _Phase as _AimPhase
+    from visionarcade.constants import AIM_MAX_MISSES
+
+    manager.active_game._phase = _AimPhase.PLAYING
+    manager.active_game._targets_missed = AIM_MAX_MISSES - 1
+    manager.active_game._target_time_remaining = -1.0
+    manager.update(_empty_intent(), [], [], DT)
+
+    assert manager.state == ArcadeState.RESULTS
+    assert manager.scores.best_score("aim") is not None
+    assert manager.profile.total_games_played == 1
+
+
+def test_draw_does_not_raise_for_aim_in_every_state(renderer, isolated_user_data_dir):
+    manager = ArcadeManager(
+        width=renderer.surface.get_width(),
+        height=renderer.surface.get_height(),
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    manager._start_game("aim")
     manager.draw(renderer.surface)  # PLAYING
     manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
     manager.draw(renderer.surface)  # PAUSED

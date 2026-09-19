@@ -4,7 +4,7 @@ A completely touchless, computer-vision-controlled arcade — played entirely
 through webcam-tracked hand gestures, no mouse or touchscreen required
 during gameplay.
 
-> **Status: Phase 6 of 10 (Vision Slice — the third real, fully
+> **Status: Phase 7 of 10 (Vision Aim — the fourth real, fully
 > playable mini-game).** This README is a working placeholder. The
 > full project overview, gesture/control tables, game descriptions,
 > screenshots, and troubleshooting guide are written in Phase 10 once
@@ -35,40 +35,54 @@ game.
 (1-player vs AI, or 2-player), a beatable AI opponent, and two-layer
 ball acceleration (match-long ramp plus per-rally speedup).
 
-**Phase 6 — Vision Slice:**
-- `arcade/collision.py` gained `segment_circle_intersect` — tests each
-  frame's hand-motion segment against every target, not just the
-  current point, so a fast swipe that would sail past a target's
-  center between two sampled frames still registers as a hit
-- Targets launch from the bottom in a parabolic arc (gravity pulls
-  them back down) rather than falling straight like Catch's objects,
-  giving Slice a distinct feel
-- Three target categories: common (chain-scored), rare gold (flat
-  bonus), and bombs (avoid — slicing one costs a life and screen-shakes)
-- A short fading trail follows your hand for both feedback and
-  readability, and a genuine "satisfying slice animation": particle
-  bursts plus small rotating shards that fly apart on every cut
-- A chain/combo multiplier that decays fast (0.6s) if you stop
-  slicing, distinct from Catch/Pong's slower combo windows —
-  matching Slice's faster-paced feel
+**Phase 6 — Vision Slice:** trajectory-based swipe collision
+(`segment_circle_intersect`), targets that arc under gravity, three
+target categories, a fast-decaying chain multiplier, a fading blade
+trail, and rotating shard effects on every cut.
 
-Test suite (`tests/`) covers all of the above — 422 tests, including
-end-to-end tests that play real rounds of Catch, Pong, and Slice
+**Phase 7 — Vision Aim:**
+- A crosshair reticle follows your index fingertip, with a visible
+  hover highlight before you commit — "the UI should show what the
+  system thinks the player is doing"
+- A sequence of 20 targets, one at a time, each with a shrinking time
+  limit that gets tighter as the sequence progresses (ramped by target
+  index rather than wall-clock time, since Aim's pacing is inherently
+  target-by-target)
+- Scoring rewards both accuracy (you have to actually hit it) and
+  reaction time (a speed bonus that tapers to zero near the limit),
+  plus a streak multiplier for consecutive hits
+- Tracks accuracy, average reaction time, missed-target count, and
+  best streak — all surfaced on the results screen
+- A miss budget (5) that ends the sequence early as "Sequence Failed"
+  if exceeded, giving Aim genuine win/loss feedback despite having no
+  lives or opponent in the traditional sense
+
+Test suite (`tests/`) covers all of the above — 450 tests, including
+end-to-end tests that play real rounds of Catch, Pong, Slice, and Aim
 through the actual app loop, nothing mocked below the OS event queue.
+
+While wiring up this phase's end-to-end test, I found and fixed a real
+bug from Phase 6: an earlier edit had accidentally merged the Pong
+end-to-end test's body into the Slice test (its `def` line was lost in
+the edit), so it silently stopped existing as its own discoverable
+test — nothing failed, it just quietly ran as unreachable-looking
+trailing code inside a different test. Fixed by splitting it back into
+its own function; the suite now correctly discovers and runs it
+separately.
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python main.py                # launch: Catch, Pong, and Slice are all fully playable
+python main.py                # launch: Catch, Pong, Slice, and Aim are all fully playable
 python main.py --debug        # verbose logging + on-screen intent debug text
 python main.py --simulate --debug
     # keyboard-controlled hand: arrow keys move it, space pinches —
     # play any implemented game without a webcam
 ```
 
-Vision Aim and Puzzle still show a "coming in a future phase"
-placeholder when selected — that's expected until Phases 7-8.
+Vision Puzzle still shows a "coming in a future phase" placeholder
+when selected — that's expected until Phase 8.
 
 ## Running tests
 
@@ -77,16 +91,8 @@ pytest
 ```
 
 Tests run headless via pygame's dummy video/audio drivers. Anything
-involving randomness (spawn/launch timing, direction, target category,
-AI aim error, particle bursts) is seeded via an injected
-`random.Random`, so gameplay tests are fully deterministic. Building
-the Phase 6 end-to-end test surfaced a good general lesson, noted in
-the test file: a target that's independently simulated with real
-physics (gravity) during a scripted test can't be aimed at using a
-stale, pre-computed position — either track its live position each
-frame, or pin it if the test is really about something else (here,
-swipe *detection* through the real smoothing pipeline, not tracking a
-falling target, which is already covered by `test_slice_game.py`).
+involving randomness (target placement) is seeded via an injected
+`random.Random`, so gameplay tests are fully deterministic.
 
 ## A note on MediaPipe
 
@@ -99,8 +105,8 @@ gracefully (no crash) if that download ever fails.
 
 ## Roadmap
 
-Vision Aim and Puzzle (Phases 7-8, each implementing
-`arcade.game.ArcadeGame` and registering one line in
-`arcade/manager.py`'s `GAME_FACTORIES`), followed by polish — particle
-variety, transitions, a full accessibility pass (Phase 9) — and full
+Vision Puzzle (Phase 8, implementing `arcade.game.ArcadeGame` and
+registering one line in `arcade/manager.py`'s `GAME_FACTORIES`) — the
+fifth and final minimum-required game — followed by polish (particle
+variety, transitions, a full accessibility pass, Phase 9) and full
 documentation/packaging (Phase 10).

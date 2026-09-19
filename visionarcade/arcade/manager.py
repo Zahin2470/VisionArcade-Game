@@ -19,6 +19,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 import pygame
 
 from visionarcade.arcade.game import ArcadeGame
+from visionarcade.arcade.games.aim import AimGame
 from visionarcade.arcade.games.catch import CatchGame
 from visionarcade.arcade.games.pong import PongGame
 from visionarcade.arcade.games.slice import SliceGame
@@ -52,6 +53,7 @@ GAME_FACTORIES: Dict[str, GameFactory] = {
     "catch": lambda w, h, theme, typography: CatchGame(w, h, theme, typography),
     "pong": lambda w, h, theme, typography: PongGame(w, h, theme, typography),
     "slice": lambda w, h, theme, typography: SliceGame(w, h, theme, typography),
+    "aim": lambda w, h, theme, typography: AimGame(w, h, theme, typography),
 }
 
 

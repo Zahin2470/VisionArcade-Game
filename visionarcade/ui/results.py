@@ -26,6 +26,7 @@ _OUTCOME_HEADLINES = {
     "player_loss": "You Lose",
     "left_win": "Left Player Wins!",
     "right_win": "Right Player Wins!",
+    "too_many_misses": "Sequence Failed",
 }
 
 

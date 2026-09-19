@@ -223,3 +223,21 @@ SLICE_TRAIL_LENGTH: int = 14
 
 SLICE_SCREEN_SHAKE_DURATION: float = 0.25
 SLICE_SCREEN_SHAKE_MAGNITUDE: float = 9.0  # px
+
+# --- Vision Aim tuning (Phase 7) ----------------------------------------------
+AIM_TARGET_COUNT: int = 20
+AIM_MAX_MISSES: int = 5
+AIM_COUNTDOWN_SECONDS: float = 3.0
+AIM_TARGET_RADIUS: float = 34.0
+
+# The per-target time limit ramps down over the *sequence* (by target
+# index), not elapsed wall-clock time — Aim's pacing is target-by-target.
+AIM_TIME_LIMIT_START: float = 1.8
+AIM_TIME_LIMIT_END: float = 0.9
+AIM_DIFFICULTY_RAMP_TARGETS: float = 15.0
+
+AIM_BASE_POINTS: int = 20
+AIM_SPEED_BONUS_MAX: int = 30  # extra points for an instant reaction, tapering to 0 near the limit
+
+AIM_STREAK_MAX_MULTIPLIER: float = 3.0
+AIM_STREAK_MULTIPLIER_STEP: float = 0.25

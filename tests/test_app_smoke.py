@@ -222,6 +222,9 @@ def test_simulate_mode_plays_a_real_round_of_slice_end_to_end(tmp_path, monkeypa
         assert game._score.score > 0
     finally:
         app.shutdown()
+
+
+def test_simulate_mode_plays_a_real_match_of_pong_end_to_end(tmp_path, monkeypatch):
     """Drive the actual app into Vision Pong, pick 1-player mode via a
     real touchless pinch on the in-game menu, and win a point — nothing
     mocked below the OS event queue.
@@ -296,5 +299,67 @@ def test_simulate_mode_plays_a_real_round_of_slice_end_to_end(tmp_path, monkeypa
         app.step()
         assert game.is_finished() is True
         assert app.arcade_manager.state.value == "results"
+    finally:
+        app.shutdown()
+
+
+def test_simulate_mode_plays_a_real_round_of_aim_end_to_end(tmp_path, monkeypatch):
+    """Drive the actual app into Vision Aim and hit a real target by
+    moving the simulated hand onto it and pinching, through the real
+    intent pipeline — nothing mocked below the OS event queue."""
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=640, window_height=480, simulate=True)
+    app = VisionArcadeApp(config)
+    app.start()
+    monkeypatch.setattr(app, "_apply_simulated_keyboard_input", lambda dt: None)
+
+    try:
+        # Select Vision Aim's card (fourth item in the hub).
+        for _ in range(5):
+            app.step()
+        for _ in range(3):
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT))
+            app.step()
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        app.step()
+        game = app.arcade_manager.active_game
+        assert game is not None and game.id == "aim"
+
+        # Fast-forward through the countdown; a target is now live.
+        from visionarcade.arcade.games.aim import _Phase
+        from visionarcade.vision.calibration import CalibrationData
+
+        for _ in range(300):
+            app.step()
+            if game._phase is _Phase.PLAYING:
+                break
+        assert game._phase is _Phase.PLAYING
+        assert game._target_pos is not None
+
+        # Move the simulated hand onto the target (accounting for the
+        # default calibration's coordinate remap, as in earlier
+        # end-to-end tests) and hold there long enough for the position
+        # smoother to actually arrive, then hold a pinch.
+        default_calibration = CalibrationData.default()
+        rel_x = (game._target_pos[0] - game.play_area.left) / game.play_area.width
+        rel_y = (game._target_pos[1] - game.play_area.top) / game.play_area.height
+        raw_x = default_calibration.x_min + rel_x * (default_calibration.x_max - default_calibration.x_min)
+        raw_y = default_calibration.y_min + rel_y * (default_calibration.y_max - default_calibration.y_min)
+        app.simulator.move_hand("Right", (raw_x, raw_y))
+        for _ in range(30):
+            app.step()
+
+        app.simulator.set_pinch("Right", True)
+        for _ in range(60):
+            app.step()
+            if game._targets_hit > 0 or game.is_finished():
+                break
+
+        assert game._targets_hit >= 1
+        assert game._score.score > 0
     finally:
         app.shutdown()
