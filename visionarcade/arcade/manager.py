@@ -22,6 +22,7 @@ from visionarcade.arcade.game import ArcadeGame
 from visionarcade.arcade.games.aim import AimGame
 from visionarcade.arcade.games.catch import CatchGame
 from visionarcade.arcade.games.pong import PongGame
+from visionarcade.arcade.games.puzzle import PuzzleGame
 from visionarcade.arcade.games.slice import SliceGame
 from visionarcade.arcade.state import ArcadeState
 from visionarcade.audio.effects import SoundEffects
@@ -54,6 +55,7 @@ GAME_FACTORIES: Dict[str, GameFactory] = {
     "pong": lambda w, h, theme, typography: PongGame(w, h, theme, typography),
     "slice": lambda w, h, theme, typography: SliceGame(w, h, theme, typography),
     "aim": lambda w, h, theme, typography: AimGame(w, h, theme, typography),
+    "puzzle": lambda w, h, theme, typography: PuzzleGame(w, h, theme, typography),
 }
 
 

@@ -241,3 +241,37 @@ AIM_SPEED_BONUS_MAX: int = 30  # extra points for an instant reaction, tapering 
 
 AIM_STREAK_MAX_MULTIPLIER: float = 3.0
 AIM_STREAK_MULTIPLIER_STEP: float = 0.25
+
+# --- Vision Puzzle tuning (Phase 8) -------------------------------------------
+PUZZLE_STAGE_COUNT: int = 3
+PUZZLE_BASE_PIECE_COUNT: int = 3  # stage i (0-indexed) presents BASE + i pieces
+PUZZLE_COUNTDOWN_SECONDS: float = 3.0
+PUZZLE_STAGE_TRANSITION_SECONDS: float = 1.5
+
+# Later stages have more pieces AND less time — a genuine difficulty
+# ramp, indexed by stage number rather than wall-clock time.
+PUZZLE_STAGE_TIME_START: float = 45.0
+PUZZLE_STAGE_TIME_END: float = 30.0
+
+PUZZLE_PIECE_RADIUS: float = 30.0
+PUZZLE_SLOT_RADIUS: float = 34.0  # slightly larger than a piece, for placement tolerance
+PUZZLE_GRAB_RADIUS: float = 40.0  # how close a pointer must be to grab a loose piece
+
+PUZZLE_BASE_POINTS_PER_PIECE: int = 30
+PUZZLE_STAGE_BONUS_STEP: float = 0.25  # each stage's pieces are worth 25% more than the last
+
+PUZZLE_STREAK_MAX_MULTIPLIER: float = 2.5
+PUZZLE_STREAK_MULTIPLIER_STEP: float = 0.3
+
+#: Five visually distinct piece kinds (shape name, polygon side count;
+#: 0 sides means "draw a circle"), paired with a fixed, theme-independent
+#: color palette — puzzle pieces need to be tellable apart from each
+#: other more than they need to match a theme's palette.
+PUZZLE_PIECE_KINDS: tuple = ("circle", "triangle", "square", "diamond", "pentagon")
+PUZZLE_PIECE_COLORS: tuple = (
+    (231, 76, 60),  # circle: red
+    (241, 196, 15),  # triangle: yellow
+    (46, 204, 113),  # square: green
+    (52, 152, 219),  # diamond: blue
+    (155, 89, 182),  # pentagon: purple
+)

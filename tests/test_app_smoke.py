@@ -303,7 +303,88 @@ def test_simulate_mode_plays_a_real_match_of_pong_end_to_end(tmp_path, monkeypat
         app.shutdown()
 
 
-def test_simulate_mode_plays_a_real_round_of_aim_end_to_end(tmp_path, monkeypatch):
+def test_simulate_mode_plays_a_real_round_of_puzzle_end_to_end(tmp_path, monkeypatch):
+    """Drive the actual app into Vision Puzzle and place a real piece
+    by grabbing it (pinch), dragging it to its matching slot, and
+    releasing — through the real intent pipeline, nothing mocked below
+    the OS event queue."""
+    monkeypatch.setattr("visionarcade.persistence.settings.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+
+    config = AppConfig(window_width=640, window_height=480, simulate=True)
+    app = VisionArcadeApp(config)
+    app.start()
+    monkeypatch.setattr(app, "_apply_simulated_keyboard_input", lambda dt: None)
+
+    try:
+        # Select Vision Puzzle's card (fifth item in the hub).
+        for _ in range(5):
+            app.step()
+        for _ in range(4):
+            pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RIGHT))
+            app.step()
+        pygame.event.post(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN))
+        app.step()
+        game = app.arcade_manager.active_game
+        assert game is not None and game.id == "puzzle"
+
+        from visionarcade.arcade.games.puzzle import _Phase
+        from visionarcade.vision.calibration import CalibrationData
+
+        for _ in range(300):
+            app.step()
+            if game._phase is _Phase.PLAYING:
+                break
+        assert game._phase is _Phase.PLAYING
+
+        default_calibration = CalibrationData.default()
+
+        def to_raw(rel_x: float, rel_y: float):
+            raw_x = default_calibration.x_min + rel_x * (default_calibration.x_max - default_calibration.x_min)
+            raw_y = default_calibration.y_min + rel_y * (default_calibration.y_max - default_calibration.y_min)
+            return (raw_x, raw_y)
+
+        def rel_of(point):
+            return (
+                (point[0] - game.play_area.left) / game.play_area.width,
+                (point[1] - game.play_area.top) / game.play_area.height,
+            )
+
+        # Move onto the first piece and hold long enough for the
+        # position smoother to actually arrive, then hold a pinch to
+        # grab it.
+        piece = game._pieces[0]
+        app.simulator.move_hand("Right", to_raw(*rel_of((piece.x, piece.y))))
+        for _ in range(30):
+            app.step()
+        app.simulator.set_pinch("Right", True)
+        for _ in range(60):
+            app.step()
+            if game._held_by["Right"] == 0:
+                break
+        assert game._held_by["Right"] == 0
+
+        # Drag it to its matching slot (tracking the piece's own
+        # position, which now follows the smoothed hand — pinning
+        # isn't needed here since the piece only moves because the
+        # hand does, unlike Slice's independently-gravity-driven target).
+        matching_slot = next(s for s in game._slots if s.kind_index == piece.kind_index)
+        app.simulator.move_hand("Right", to_raw(*rel_of((matching_slot.x, matching_slot.y))))
+        for _ in range(60):
+            app.step()
+
+        app.simulator.set_pinch("Right", False)
+        for _ in range(30):
+            app.step()
+            if piece.placed:
+                break
+
+        assert piece.placed is True
+        assert game._score.score > 0
+    finally:
+        app.shutdown()
     """Drive the actual app into Vision Aim and hit a real target by
     moving the simulated hand onto it and pinching, through the real
     intent pipeline — nothing mocked below the OS event queue."""

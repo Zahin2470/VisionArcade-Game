@@ -4,11 +4,11 @@ A completely touchless, computer-vision-controlled arcade — played entirely
 through webcam-tracked hand gestures, no mouse or touchscreen required
 during gameplay.
 
-> **Status: Phase 7 of 10 (Vision Aim — the fourth real, fully
-> playable mini-game).** This README is a working placeholder. The
-> full project overview, gesture/control tables, game descriptions,
-> screenshots, and troubleshooting guide are written in Phase 10 once
-> every system exists to document.
+> **Status: Phase 8 of 10 — all 5 minimum-required mini-games are now
+> complete and fully playable.** This README is a working placeholder.
+> The full project overview, gesture/control tables, game
+> descriptions, screenshots, and troubleshooting guide are written in
+> Phase 10 once every system exists to document.
 
 ## What exists right now
 
@@ -40,49 +40,43 @@ ball acceleration (match-long ramp plus per-rally speedup).
 target categories, a fast-decaying chain multiplier, a fading blade
 trail, and rotating shard effects on every cut.
 
-**Phase 7 — Vision Aim:**
-- A crosshair reticle follows your index fingertip, with a visible
-  hover highlight before you commit — "the UI should show what the
-  system thinks the player is doing"
-- A sequence of 20 targets, one at a time, each with a shrinking time
-  limit that gets tighter as the sequence progresses (ramped by target
-  index rather than wall-clock time, since Aim's pacing is inherently
-  target-by-target)
-- Scoring rewards both accuracy (you have to actually hit it) and
-  reaction time (a speed bonus that tapers to zero near the limit),
-  plus a streak multiplier for consecutive hits
-- Tracks accuracy, average reaction time, missed-target count, and
-  best streak — all surfaced on the results screen
-- A miss budget (5) that ends the sequence early as "Sequence Failed"
-  if exceeded, giving Aim genuine win/loss feedback despite having no
-  lives or opponent in the traditional sense
+**Phase 7 — Vision Aim:** a hover-aware reticle, a 20-target sequence
+with a per-target time limit that tightens as it progresses, scoring
+that rewards both speed and accuracy, and a miss budget that gives a
+lives-free game genuine win/loss stakes.
 
-Test suite (`tests/`) covers all of the above — 450 tests, including
-end-to-end tests that play real rounds of Catch, Pong, Slice, and Aim
-through the actual app loop, nothing mocked below the OS event queue.
+**Phase 8 — Vision Puzzle (the fifth and final required game):**
+- Pinch to grab a piece, drag it, release it on the matching
+  shape-and-color slot — five distinct shapes (circle, triangle,
+  square, diamond, pentagon), each with its own color, so pieces are
+  never ambiguous
+- Both hands work independently and simultaneously — grabbing and
+  placing two pieces at once (one per hand) is just something a player
+  can choose to do, not a separate mode to toggle
+- Three stages, each with more pieces *and* less time than the last —
+  a genuine difficulty ramp indexed by stage rather than wall-clock time
+- Wrist/hand-orientation rotation (one of the spec's suggested
+  "advanced" options, explicitly marked "if robust") was deliberately
+  **not** built: our stabilized `HandIntent` has no orientation
+  signal, and adding one would mean extending the whole vision
+  pipeline for a single optional feature. Shape+color matching is a
+  complete puzzle without it — documented in the game's own docstring
+  rather than silently dropped
 
-While wiring up this phase's end-to-end test, I found and fixed a real
-bug from Phase 6: an earlier edit had accidentally merged the Pong
-end-to-end test's body into the Slice test (its `def` line was lost in
-the edit), so it silently stopped existing as its own discoverable
-test — nothing failed, it just quietly ran as unreachable-looking
-trailing code inside a different test. Fixed by splitting it back into
-its own function; the suite now correctly discovers and runs it
-separately.
+Test suite (`tests/`) covers all of the above — 477 tests, including
+end-to-end tests that play real rounds of all five games through the
+actual app loop, nothing mocked below the OS event queue.
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python main.py                # launch: Catch, Pong, Slice, and Aim are all fully playable
+python main.py                # launch: all 5 games are fully playable
 python main.py --debug        # verbose logging + on-screen intent debug text
 python main.py --simulate --debug
     # keyboard-controlled hand: arrow keys move it, space pinches —
-    # play any implemented game without a webcam
+    # play any game without a webcam
 ```
-
-Vision Puzzle still shows a "coming in a future phase" placeholder
-when selected — that's expected until Phase 8.
 
 ## Running tests
 
@@ -91,8 +85,9 @@ pytest
 ```
 
 Tests run headless via pygame's dummy video/audio drivers. Anything
-involving randomness (target placement) is seeded via an injected
-`random.Random`, so gameplay tests are fully deterministic.
+involving randomness (spawn/launch timing, target/piece placement, AI
+aim error, particle bursts) is seeded via an injected `random.Random`,
+so gameplay tests are fully deterministic.
 
 ## A note on MediaPipe
 
@@ -105,8 +100,9 @@ gracefully (no crash) if that download ever fails.
 
 ## Roadmap
 
-Vision Puzzle (Phase 8, implementing `arcade.game.ArcadeGame` and
-registering one line in `arcade/manager.py`'s `GAME_FACTORIES`) — the
-fifth and final minimum-required game — followed by polish (particle
-variety, transitions, a full accessibility pass, Phase 9) and full
-documentation/packaging (Phase 10).
+With all 5 games playable, what's left is polish and packaging:
+particle variety, transitions, a full accessibility pass (Phase 9),
+then full documentation and packaging (Phase 10) — README overhaul
+with gesture/control tables and screenshots, a proper project
+structure writeup, and a final acceptance pass against every
+requirement in the original design brief.
