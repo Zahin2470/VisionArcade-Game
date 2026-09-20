@@ -10,7 +10,7 @@ from __future__ import annotations
 
 # --- Application ---------------------------------------------------------
 APP_NAME: str = "VisionArcade"
-APP_VERSION: str = "1.0.0"
+APP_VERSION: str = "1.0.1"
 
 # --- Window / rendering ---------------------------------------------------
 DEFAULT_WINDOW_WIDTH: int = 1280
@@ -255,7 +255,7 @@ PUZZLE_STAGE_TIME_END: float = 30.0
 
 PUZZLE_PIECE_RADIUS: float = 30.0
 PUZZLE_SLOT_RADIUS: float = 34.0  # slightly larger than a piece, for placement tolerance
-PUZZLE_GRAB_RADIUS: float = 40.0  # how close a pointer must be to grab a loose piece
+PUZZLE_GRAB_RADIUS: float = 55.0  # how close a pointer must be to grab a loose piece
 
 PUZZLE_BASE_POINTS_PER_PIECE: int = 30
 PUZZLE_STAGE_BONUS_STEP: float = 0.25  # each stage's pieces are worth 25% more than the last

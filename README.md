@@ -26,8 +26,9 @@ watch your score, combo, and progress update live.
 11. [Testing](#testing)
 12. [Project Structure](#project-structure)
 13. [Design Decisions](#design-decisions)
-14. [Known Limitations](#known-limitations)
-15. [Roadmap](#roadmap)
+14. [Post-Launch Fixes](#post-launch-fixes)
+15. [Known Limitations](#known-limitations)
+16. [Roadmap](#roadmap)
 
 ---
 
@@ -324,19 +325,49 @@ and test downstream of `IntentBuilder` runs through *identical* code
 whether the input is a webcam or a keyboard. Games never know the
 difference, and neither does the test suite.
 
+## Post-Launch Fixes
+
+Real hands-on testing (with an actual webcam, which this project's own
+development environment never had) surfaced three issues, all now fixed:
+
+1. **No live camera feed.** The calibration screen showed only an
+   instructional guide box, and there was no camera view anywhere else
+   in the app — making it hard to understand what the system was
+   seeing. Fixed with a real `CameraView` component (cover-fit
+   scaling/cropping, a smooth vignette, a live/no-signal status badge):
+   calibration now shows your actual camera feed filling the guide
+   box, and a small persistent preview appears in the corner of every
+   other screen.
+2. **Vision Pong's two-player mode couldn't be selected.** Two
+   compounding bugs: the mode-select menu used `intent.primary()`,
+   which always prefers the right hand — so pointing with your *left*
+   hand (natural for a game about using both hands) had its pinch
+   silently ignored whenever the right hand was also visible. Separately,
+   activation only checked the single exact frame a pinch transitioned
+   to `START`; a real pinch involves slight hand drift while closing
+   the fingers, so the pointer often wasn't over the button on that
+   precise frame. Fixed by checking both hands independently and
+   accepting `START` or `HOLD`.
+3. **Vision Puzzle pieces wouldn't grab reliably.** The same
+   single-exact-frame issue as above — grabbing was only attempted on
+   the precise frame `pinch_state` flipped to `START`. Fixed the same
+   way (accept `START` or `HOLD`), and widened the grab radius
+   (40px → 55px) for more forgiving real-world precision.
+
+All three are covered by new regression tests (`test_camera_view.py`,
+and new cases in `test_pong_game.py` and `test_puzzle_game.py`) that
+specifically reproduce the bug scenario before asserting the fix.
+
 ## Known Limitations
 
 In the interest of an honest final accounting rather than a polished-sounding
 omission:
 
-- **Camera presentation is minimal.** The calibration screen shows an
-  instructional guide box, not a live processed camera feed with a
-  tracked-hand overlay, gesture label, and confidence indicator (as the
-  original design brief describes). This was a deliberate scope decision
-  in Phase 9 — building it properly late in the project risked shipping
-  something under-tested rather than adding it cleanly. The guide box
-  and instructions are fully functional; the visual camera preview
-  itself is the gap.
+- **The camera preview shows the feed itself, not a tracked-hand
+  overlay.** The original design brief also describes a gesture label
+  and confidence indicator drawn directly on the camera view. The feed
+  is now real and live (see Post-Launch Fixes above); the overlay
+  annotations on top of it are not yet built.
 - **`--game <name>` direct-launch** is accepted by the CLI parser but
   does not yet skip the hub — it launches the app at the home screen
   regardless of the value passed. Selecting the game from the hub works
@@ -356,9 +387,9 @@ omission:
 
 ## Roadmap
 
-- Full camera-presentation pass: live feed with vignette on the
-  calibration screen, and a debug-only preview panel (gesture label,
-  confidence, tracked-hand overlay, FPS) during gameplay.
+- A tracked-hand overlay, gesture label, and confidence indicator drawn
+  directly on the camera view (the feed itself is live now — see Known
+  Limitations above).
 - `--game <name>` direct-launch actually bypassing the hub.
 - Two-hand gesture vocabulary (spread-to-zoom, two-hand pinch) for a
   possible sixth game.

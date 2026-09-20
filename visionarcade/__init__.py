@@ -21,4 +21,4 @@ tracker, base renderer, and asset manager. Everything else is stabilized
 by Phase 9, and all 5 minimum-required games are complete and playable.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

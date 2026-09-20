@@ -32,6 +32,7 @@ from visionarcade.constants import GAME_METADATA
 from visionarcade.persistence.profiles import PlayerProfile, save_profile
 from visionarcade.persistence.scores import ScoresStore, save_scores
 from visionarcade.persistence.settings import Settings, save_settings
+from visionarcade.rendering.camera_view import CameraView
 from visionarcade.rendering.share_card import generate_share_card
 from visionarcade.rendering.themes import Theme, get_theme
 from visionarcade.rendering.transitions import FadeTransition
@@ -108,6 +109,21 @@ class ArcadeManager:
         self.results_screen = ResultsScreen(width, height)
         self._transition = FadeTransition(width, height)
 
+        # A small, persistent camera preview shown across every screen
+        # except calibration (which already shows a full-size one) —
+        # so a player can always see and understand their own tracked
+        # hand movement, not just during calibration.
+        preview_size = (200, 150)
+        preview_margin = 20
+        preview_rect = pygame.Rect(
+            width - preview_size[0] - preview_margin,
+            height - preview_size[1] - preview_margin,
+            *preview_size,
+        )
+        self.camera_preview = CameraView(preview_rect)
+        self._camera_frame = None
+        self._camera_available = False
+
         self.audio.apply_settings(
             settings.master_volume, settings.sfx_volume, settings.music_volume, settings.muted
         )
@@ -127,7 +143,12 @@ class ArcadeManager:
         raw_hand_results: List[HandResult],
         key_events: List[int],
         dt: float,
+        camera_frame=None,
+        camera_available: bool = False,
     ) -> None:
+        self._camera_frame = camera_frame
+        self._camera_available = camera_available
+
         primary = intent.primary()
         pointer: Optional[Point] = None
         if primary.present and primary.index_tip is not None:
@@ -327,7 +348,10 @@ class ArcadeManager:
         elif self.state == ArcadeState.SETTINGS:
             self.settings_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.CALIBRATION:
-            self.calibration_screen.draw(surface, self.typography, theme)
+            self.calibration_screen.draw(
+                surface, self.typography, theme,
+                camera_frame=self._camera_frame, camera_available=self._camera_available,
+            )
         elif self.state == ArcadeState.TUTORIAL:
             self.tutorial_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.PLAYING:
@@ -337,6 +361,16 @@ class ArcadeManager:
             self.pause_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.RESULTS:
             self.results_screen.draw(surface, self.typography, theme, game_title=self._active_game_title())
+
+        if self.state != ArcadeState.CALIBRATION:
+            # Calibration already shows a full-size live view; everywhere
+            # else gets a small persistent corner preview, so a player
+            # can always see and understand their own tracked hand
+            # movement, not just while calibrating.
+            self.camera_preview.draw(
+                surface, self._camera_frame, camera_available=self._camera_available,
+                theme=theme, typography=self.typography,
+            )
 
         self._transition.draw(surface)
 

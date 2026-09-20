@@ -78,6 +78,7 @@ class VisionArcadeApp:
 
         self.arcade_manager: Optional[ArcadeManager] = None
         self._camera_available = False
+        self._last_camera_frame = None
         self._started = False
         self._clock: Optional[pygame.time.Clock] = None
 
@@ -166,7 +167,14 @@ class VisionArcadeApp:
                 self.arcade_manager.settings.smoothing_multiplier,
             )
         self.latest_intent = self.intent_builder.update(hand_results, dt)
-        self.arcade_manager.update(self.latest_intent, hand_results, key_events, dt)
+        self.arcade_manager.update(
+            self.latest_intent,
+            hand_results,
+            key_events,
+            dt,
+            camera_frame=self._last_camera_frame,
+            camera_available=self._camera_available and self.simulator is None,
+        )
 
         self._render_frame()
 
@@ -175,14 +183,20 @@ class VisionArcadeApp:
     def _collect_hand_results(self, dt: float) -> List[HandResult]:
         if self.simulator is not None:
             self._apply_simulated_keyboard_input(dt)
+            self._last_camera_frame = None
             return self.simulator.get_hand_results()
 
         frame = self.camera.read_frame() if self._camera_available else None
+        if (
+            frame is not None
+            and self.arcade_manager is not None
+            and self.arcade_manager.settings.camera_mirror
+        ):
+            frame = cv2.flip(frame, 1)  # horizontal flip: feels like a mirror to the player
+        self._last_camera_frame = frame
+
         if frame is None or self.tracker is None:
             return []
-
-        if self.arcade_manager is not None and self.arcade_manager.settings.camera_mirror:
-            frame = cv2.flip(frame, 1)  # horizontal flip: feels like a mirror to the player
 
         return self.tracker.process(frame)
 

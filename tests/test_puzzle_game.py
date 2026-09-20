@@ -190,6 +190,29 @@ def test_hand_disappearing_mid_hold_releases_the_piece():
     assert game._held_by["Right"] is None
 
 
+def test_grab_still_succeeds_if_pointer_arrives_after_pinch_already_holds():
+    """Regression test: a real pinch naturally involves slight hand
+    drift while the fingers close, so the exact frame `pinch_state`
+    flips to START may not be the frame the pointer is actually over
+    the piece. Grabbing must still succeed once the pointer catches up,
+    as long as the pinch is still being held (not just on that one
+    exact transition frame)."""
+    game = _game()
+    _advance_past_countdown(game)
+    piece = game._pieces[0]
+
+    # Pinch starts while hovering somewhere else (missing the piece).
+    game.handle_intent(FrameIntent(left=_absent("Left"), right=_hand_at(0.01, 0.01, pinch=PinchState.START)))
+    game.update(DT)
+    assert game._held_by["Right"] is None
+
+    # Pointer then drifts onto the piece while the pinch is still held (HOLD, not START).
+    rel_x, rel_y = _rel(game, (piece.x, piece.y))
+    game.handle_intent(FrameIntent(left=_absent("Left"), right=_hand_at(rel_x, rel_y, pinch=PinchState.HOLD)))
+    game.update(DT)
+    assert game._held_by["Right"] == 0
+
+
 # --- Two-hand play -----------------------------------------------------------------
 
 def test_both_hands_can_grab_different_pieces_simultaneously():

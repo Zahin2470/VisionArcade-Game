@@ -26,7 +26,7 @@ import pygame
 from visionarcade.arcade.collision import circle_rect_overlap
 from visionarcade.arcade.difficulty import DifficultyCurve
 from visionarcade.arcade.game import ArcadeGame
-from visionarcade.arcade.input import build_game_input, map_point_to_rect
+from visionarcade.arcade.input import map_point_to_rect
 from visionarcade.arcade.scoring import ComboTracker
 from visionarcade.constants import (
     PONG_AI_REACTION_ERROR,
@@ -50,7 +50,7 @@ from visionarcade.rendering.particles import ParticleSystem
 from visionarcade.rendering.themes import Theme
 from visionarcade.rendering.typography import Typography
 from visionarcade.ui.navigation import FocusGroup, SelectableItem
-from visionarcade.vision.gestures import FrameIntent
+from visionarcade.vision.gestures import FrameIntent, PinchState
 
 _MODE_BUTTON_WIDTH = 260
 _MODE_BUTTON_HEIGHT = 140
@@ -212,12 +212,21 @@ class PongGame(ArcadeGame):
     def _update_mode_select(self) -> None:
         if self._intent is None:
             return
-        game_input = build_game_input(self._intent, self.play_area)
-        self._mode_focus.update_pointer(game_input.pointer)
-        if game_input.pinch_just_started:
-            activated = self._mode_focus.activate_focused()
-            if activated is not None:
-                self._start_mode(activated)
+        # Check both hands independently rather than only the "primary"
+        # (right-preferring) hand: a player naturally reaching for this
+        # two-hand game's menu with their left hand should not have
+        # their pinch silently ignored just because their right hand
+        # also happens to be visible in frame.
+        for hand in (self._intent.left, self._intent.right):
+            if not hand.present or hand.position is None:
+                continue
+            pointer = map_point_to_rect(hand.position, self.play_area)
+            self._mode_focus.update_pointer(pointer)
+            if hand.pinch_state in (PinchState.START, PinchState.HOLD):
+                activated = self._mode_focus.activate_focused()
+                if activated is not None:
+                    self._start_mode(activated)
+                    return
 
     def _start_mode(self, mode_id: str) -> None:
         self._mode = PongMode.SINGLE_PLAYER if mode_id == "single" else PongMode.TWO_PLAYER

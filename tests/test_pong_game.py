@@ -115,6 +115,43 @@ def test_no_intent_yet_does_not_crash_mode_select():
     assert game._phase is _Phase.MODE_SELECT
 
 
+def test_left_hand_can_select_two_player_even_when_right_hand_is_also_present():
+    """Regression test: mode-select must check both hands
+    independently. A user pointing at the menu with their LEFT hand
+    (natural for a two-hand game) must not be ignored just because
+    their right hand also happens to be visible in frame — the old
+    implementation used `intent.primary()`, which always prefers the
+    right hand and would silently drop the left hand's pinch entirely."""
+    game = _game()
+    item = next(i for i in game._mode_focus.items if i.item_id == "two_player")
+    rel_x = (item.rect.centerx - game.play_area.x) / game.play_area.width
+    rel_y = (item.rect.centery - game.play_area.y) / game.play_area.height
+
+    # Right hand present but stationary elsewhere, not pinching.
+    right = HandIntent(handedness="Right", present=True, position=(0.05, 0.05), pinch_state=PinchState.NONE)
+    # Left hand hovering the two_player button and pinching.
+    left = HandIntent(handedness="Left", present=True, position=(rel_x, rel_y), pinch_state=PinchState.START)
+    game.handle_intent(FrameIntent(left=left, right=right))
+    game.update(DT)
+
+    assert game._mode is PongMode.TWO_PLAYER
+
+
+def test_pinch_hold_over_a_button_activates_it_even_without_a_fresh_start_frame():
+    """Regression test: the old code only checked `pinch_just_started`
+    (the single exact transition frame). If a pinch was already being
+    held by the time the pointer arrived over a button — e.g. the
+    pointer drifted there mid-pinch, which is normal for a real
+    gesture — the old code would never activate it. HOLD must also work."""
+    game = _game()
+    item = next(i for i in game._mode_focus.items if i.item_id == "two_player")
+    rel_x = (item.rect.centerx - game.play_area.x) / game.play_area.width
+    rel_y = (item.rect.centery - game.play_area.y) / game.play_area.height
+    game.handle_intent(_intent(right=_hand(True, x=rel_x, y=rel_y, pinch=PinchState.HOLD)))
+    game.update(DT)
+    assert game._mode is PongMode.TWO_PLAYER
+
+
 # --- Countdown / paddle tracking -----------------------------------------------
 
 def test_countdown_transitions_to_playing_and_serves():

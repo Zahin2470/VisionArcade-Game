@@ -1,8 +1,8 @@
 """The first-run calibration screen.
 
 Presents `vision.calibration.CalibrationSession`'s steps visually: a
-guide box, instruction text, a live marker for the detected hand, and
-a skip affordance — the session logic itself is fully covered by
+guide box showing the player's own live camera feed, instruction text,
+and a skip affordance — the session logic itself is fully covered by
 Phase 2's tests, so this module is purely presentation plus simple
 input routing (Escape or the Skip button/pinch).
 """
@@ -11,8 +11,10 @@ from __future__ import annotations
 
 from typing import List, Optional, Tuple
 
+import numpy as np
 import pygame
 
+from visionarcade.rendering.camera_view import CameraView
 from visionarcade.rendering.themes import Theme
 from visionarcade.rendering.typography import Typography
 from visionarcade.vision.calibration import CalibrationSession, CalibrationStep
@@ -39,10 +41,11 @@ class CalibrationScreen:
         self.height = height
         self.session = CalibrationSession()
         self._skip_rect = pygame.Rect(width - 170, height - 76, 140, 48)
-        guide_size = min(width, height) // 4
+        guide_size = int(min(width, height) * 0.5)
         self._guide_rect = pygame.Rect(
             width // 2 - guide_size // 2, height // 2 - guide_size // 2, guide_size, guide_size
         )
+        self.camera_view = CameraView(self._guide_rect)
 
     def on_enter(self) -> None:
         """Start a fresh calibration session each time this screen is entered."""
@@ -70,7 +73,14 @@ class CalibrationScreen:
         self.session.update(primary_hand, dt)
         return "home" if self.session.is_done else None
 
-    def draw(self, surface: pygame.Surface, typography: Typography, theme: Theme) -> None:
+    def draw(
+        self,
+        surface: pygame.Surface,
+        typography: Typography,
+        theme: Theme,
+        camera_frame: Optional[np.ndarray] = None,
+        camera_available: bool = False,
+    ) -> None:
         surface.fill(theme.background)
 
         step_number = _STEP_PROGRESS.get(self.session.step, 1)
@@ -85,7 +95,9 @@ class CalibrationScreen:
             surface, self.session.instruction, "body", theme.text_secondary, center=(self.width // 2, 96)
         )
 
-        pygame.draw.rect(surface, theme.surface, self._guide_rect, border_radius=16)
+        self.camera_view.draw(
+            surface, camera_frame, camera_available=camera_available, theme=theme, typography=typography
+        )
         pygame.draw.rect(surface, theme.accent, self._guide_rect, width=3, border_radius=16)
 
         pygame.draw.rect(surface, theme.surface, self._skip_rect, border_radius=10)

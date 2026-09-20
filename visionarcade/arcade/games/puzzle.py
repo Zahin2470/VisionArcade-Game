@@ -257,7 +257,7 @@ class PuzzleGame(ArcadeGame):
                 self._release_piece(hand_name, held_index)
             return
 
-        if hand.pinch_state == PinchState.START:
+        if hand.pinch_state in (PinchState.START, PinchState.HOLD):
             self._try_grab(hand_name, pointer)
 
     def _try_grab(self, hand_name: str, pointer: Point) -> None:

@@ -7,6 +7,7 @@ touch the real per-user data directory.
 
 from __future__ import annotations
 
+import numpy as np
 import pygame
 import pytest
 
@@ -227,6 +228,52 @@ def test_draw_does_not_raise_in_every_state(renderer):
         manager.state = state
         manager.active_game_id = KNOWN_GAMES[0]
         manager.draw(renderer.surface)
+
+
+# --- Camera preview wiring (post-launch fix) -----------------------------------
+
+def test_camera_frame_and_availability_are_stored_from_update():
+    manager = _manager()
+    frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    manager.update(_empty_intent(), [], [], DT, camera_frame=frame, camera_available=True)
+    assert manager._camera_available is True
+    assert manager._camera_frame is frame
+
+
+def test_draw_with_a_real_camera_frame_does_not_raise_on_every_screen(renderer):
+    manager = ArcadeManager(
+        width=renderer.surface.get_width(),
+        height=renderer.surface.get_height(),
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    manager.update(_empty_intent(), [], [], DT, camera_frame=frame, camera_available=True)
+    for state in (ArcadeState.HOME, ArcadeState.SETTINGS, ArcadeState.CALIBRATION, ArcadeState.TUTORIAL):
+        manager.state = state
+        manager.draw(renderer.surface)
+
+
+def test_calibration_screen_receives_camera_frame_not_just_the_small_preview(renderer):
+    # Use realistic window dimensions for the manager itself — the
+    # shared `renderer` fixture's surface is deliberately tiny (320x240)
+    # for test speed, which would make the calibration guide smaller
+    # than the fixed-size corner preview and defeat this assertion.
+    manager = ArcadeManager(
+        width=1280,
+        height=720,
+        settings=Settings(),
+        scores=ScoresStore(),
+        profile=PlayerProfile(),
+        calibration=CalibrationData.default(),
+    )
+    frame = np.zeros((480, 640, 3), dtype=np.uint8)
+    manager.update(_empty_intent(), [], [], DT, camera_frame=frame, camera_available=True)
+    manager.state = ArcadeState.CALIBRATION
+    manager.draw(renderer.surface)  # pygame clips the overflow; drawing must not raise
+    assert manager.calibration_screen.camera_view.rect.width > manager.camera_preview.rect.width
 
 
 # --- Real gameplay: catch, pause, results (Phase 4) ---------------------------
