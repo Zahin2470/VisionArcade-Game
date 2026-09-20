@@ -14,10 +14,11 @@ from visionarcade.ui.navigation import FocusGroup, SelectableItem
 
 Point = Tuple[float, float]
 
-_BUTTON_WIDTH = 220
+_BUTTON_WIDTH = 200
 _BUTTON_HEIGHT = 56
-_BUTTON_GAP = 24
-_LABELS = (("play_again", "Play Again"), ("back_to_hub", "Back to Hub"))
+_BUTTON_GAP = 20
+_LABELS = (("play_again", "Play Again"), ("save_share_card", "Save Share Card"), ("back_to_hub", "Back to Hub"))
+_MESSAGE_SECONDS = 2.5
 
 _OUTCOME_HEADLINES = {
     "cleared": "Round Complete!",
@@ -37,6 +38,8 @@ class ResultsScreen:
         self._focus = FocusGroup()
         self.results: Dict[str, Any] = {}
         self.is_new_best = False
+        self._message = ""
+        self._message_timer = 0.0
         self._layout()
 
     def _layout(self) -> None:
@@ -53,11 +56,21 @@ class ResultsScreen:
     def on_enter(self, results: Dict[str, Any], is_new_best: bool) -> None:
         self.results = results
         self.is_new_best = is_new_best
+        self._message = ""
+        self._message_timer = 0.0
         self._focus._focus_index = 0  # noqa: SLF001 - same module family
+
+    def show_message(self, text: str) -> None:
+        """Briefly display a status line (e.g. "Share card saved") —
+        used after an action that doesn't change screens, like saving
+        a share card, so the player still gets confirmation."""
+        self._message = text
+        self._message_timer = _MESSAGE_SECONDS
 
     def update(
         self, dt: float, pointer: Optional[Point], confirm: bool, key_events: List[int]
     ) -> Optional[str]:
+        self._message_timer = max(0.0, self._message_timer - dt)
         self._focus.update_pointer(pointer)
         result: Optional[str] = None
         for key in key_events:
@@ -115,3 +128,9 @@ class ResultsScreen:
                 pygame.draw.rect(surface, theme.accent, item.rect, width=2, border_radius=12)
             label = dict(_LABELS)[item.item_id]
             typography.render(surface, label, "body", theme.text_primary, center=item.rect.center)
+
+        if self._message_timer > 0 and self._message:
+            button_top = self._focus.items[0].rect.top if self._focus.items else self.height - 140
+            typography.render(
+                surface, self._message, "small", theme.success, center=(self.width // 2, button_top - 24)
+            )

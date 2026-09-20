@@ -90,6 +90,7 @@ class CatchGame(ArcadeGame):
         theme: Theme,
         typography: Typography,
         rng: Optional[random.Random] = None,
+        reduced_particles: bool = False,
     ) -> None:
         self.width = width
         self.height = height
@@ -98,7 +99,7 @@ class CatchGame(ArcadeGame):
         self._rng = rng if rng is not None else random.Random()
 
         self.play_area = pygame.Rect(40, 120, width - 80, height - 160)
-        self.particles = ParticleSystem(rng=self._rng)
+        self.particles = ParticleSystem(rng=self._rng, reduced=reduced_particles)
         self.hud = HUD(width)
 
         self.reset()

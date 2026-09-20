@@ -18,13 +18,14 @@ def _screen():
     return HomeScreen(1280, 720, ScoresStore(), PlayerProfile())
 
 
-def test_layout_has_a_card_per_known_game_plus_three_actions():
+def test_layout_has_a_card_per_known_game_plus_four_actions():
     screen = _screen()
     ids = [item.item_id for item in screen._focus.items]
     for game_id in KNOWN_GAMES:
         assert f"play:{game_id}" in ids
     assert "settings" in ids
     assert "calibration" in ids
+    assert "tutorial" in ids
     assert "quit" in ids
 
 

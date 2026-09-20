@@ -18,12 +18,14 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 from visionarcade.constants import (
+    DEFAULT_SENSITIVITY,
     HAND_PRESENCE_CONFIRM_FRAMES,
     HAND_PRESENCE_GRACE_FRAMES,
     OPENNESS_FIST_THRESHOLD,
     PINCH_ENTER_DISTANCE,
     PINCH_EXIT_DISTANCE,
     PINCH_MIN_HOLD_FRAMES,
+    SMOOTHING_TIME_CONSTANT_SECONDS,
 )
 from visionarcade.vision.calibration import CalibrationData
 from visionarcade.vision.features import Point, extract_hand_features
@@ -188,12 +190,35 @@ class IntentBuilder:
 
     def __init__(self, calibration: Optional[CalibrationData] = None) -> None:
         self.calibration = calibration if calibration is not None else CalibrationData.default()
+        self._sensitivity: float = DEFAULT_SENSITIVITY
         self._states: Dict[str, _PerHandState] = {
             name: _PerHandState(name) for name in KNOWN_HANDEDNESS
         }
 
     def set_calibration(self, calibration: CalibrationData) -> None:
         self.calibration = calibration
+
+    def apply_accessibility_settings(self, sensitivity: float, smoothing_multiplier: float) -> None:
+        """Apply the player's sensitivity/smoothing accessibility
+        settings. Safe to call every frame — cheap, and a smoother's
+        current value is preserved (no visible jump) when its time
+        constant changes."""
+        self._sensitivity = max(1e-3, sensitivity)
+        time_constant = SMOOTHING_TIME_CONSTANT_SECONDS * max(1e-3, smoothing_multiplier)
+        for state in self._states.values():
+            state.position_smoother.set_time_constant(time_constant)
+            state.index_smoother.set_time_constant(time_constant)
+            state.pinch_distance_smoother.time_constant = time_constant
+            state.openness_smoother.time_constant = time_constant
+
+    def _apply_sensitivity(self, point: Point) -> Point:
+        """Scale a calibrated [0, 1] point's offset from center by the
+        sensitivity setting — >1 amplifies small physical movements
+        into larger on-screen ones (helpful for limited range of
+        motion), <1 dampens them (helpful for finer control)."""
+        x = max(0.0, min(1.0, 0.5 + (point[0] - 0.5) * self._sensitivity))
+        y = max(0.0, min(1.0, 0.5 + (point[1] - 0.5) * self._sensitivity))
+        return (x, y)
 
     def reset(self) -> None:
         for name in KNOWN_HANDEDNESS:
@@ -234,8 +259,8 @@ class IntentBuilder:
         self, state: _PerHandState, raw_hand: HandResult, dt: float, stable_present: bool
     ) -> HandIntent:
         features = extract_hand_features(raw_hand)
-        calibrated_position = self.calibration.remap(features.palm_center)
-        calibrated_index = self.calibration.remap(features.index_tip)
+        calibrated_position = self._apply_sensitivity(self.calibration.remap(features.palm_center))
+        calibrated_index = self._apply_sensitivity(self.calibration.remap(features.index_tip))
 
         smoothed_position = state.position_smoother.update(calibrated_position, dt)
         smoothed_index = state.index_smoother.update(calibrated_index, dt)

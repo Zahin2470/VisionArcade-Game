@@ -8,6 +8,8 @@ exercise it — no camera or mocking required.
 
 from __future__ import annotations
 
+import pytest
+
 from visionarcade.vision.gestures import IntentBuilder, PinchState, PinchStateMachine
 from visionarcade.vision.motion import SwipeDirection
 from visionarcade.vision.simulation import SimulatedHandInputSource
@@ -243,3 +245,72 @@ def test_reset_clears_all_per_hand_state():
     builder.reset()
     intent = builder.update([], DT)
     assert intent.right.present is False
+
+
+# --- Accessibility settings: sensitivity / smoothing (Phase 9) ----------------
+
+def test_default_sensitivity_is_a_no_op():
+    builder = IntentBuilder()  # default sensitivity is 1.0
+    for point in ((0.5, 0.5), (0.2, 0.8), (0.0, 1.0), (0.9, 0.1)):
+        assert builder._apply_sensitivity(point) == pytest.approx(point)
+
+
+def test_higher_sensitivity_amplifies_offset_from_center():
+    builder = IntentBuilder()
+    builder.apply_accessibility_settings(sensitivity=2.0, smoothing_multiplier=1.0)
+    source = SimulatedHandInputSource()
+    # A raw position near the edge of the default calibration range,
+    # off-center — amplified 2x around 0.5 should push the calibrated
+    # result further from center than sensitivity=1.0 would.
+    source.set_hand("Right", present=True, position=(0.7, 0.5))
+    intent = _settle_hand_present(builder, source, frames=90)
+    x, _ = intent.right.position
+
+    builder_default = IntentBuilder()
+    source_default = SimulatedHandInputSource()
+    source_default.set_hand("Right", present=True, position=(0.7, 0.5))
+    intent_default = _settle_hand_present(builder_default, source_default, frames=90)
+    x_default, _ = intent_default.right.position
+
+    assert (x - 0.5) > (x_default - 0.5)
+
+
+def test_sensitivity_result_is_clamped_to_unit_range():
+    builder = IntentBuilder()
+    builder.apply_accessibility_settings(sensitivity=10.0, smoothing_multiplier=1.0)
+    source = SimulatedHandInputSource()
+    source.set_hand("Right", present=True, position=(0.9, 0.9))
+    intent = _settle_hand_present(builder, source, frames=90)
+    x, y = intent.right.position
+    assert 0.0 <= x <= 1.0
+    assert 0.0 <= y <= 1.0
+
+
+def test_higher_smoothing_multiplier_slows_convergence():
+    # A smoother's very first-ever update snaps directly to the raw
+    # value (so a freshly-detected hand doesn't visibly "fly in" from
+    # the origin) — so to actually observe convergence speed, settle
+    # at an initial position first, then move and compare how far each
+    # configuration gets over the same short window afterward.
+    builder_smooth = IntentBuilder()
+    builder_smooth.apply_accessibility_settings(sensitivity=1.0, smoothing_multiplier=3.0)
+    source_smooth = SimulatedHandInputSource()
+    source_smooth.set_hand("Right", present=True, position=(0.5, 0.5))
+    _settle_hand_present(builder_smooth, source_smooth, frames=60)
+    source_smooth.move_hand("Right", (0.8, 0.5))
+    intent_smooth = _settle_hand_present(builder_smooth, source_smooth, frames=5)
+
+    builder_snappy = IntentBuilder()
+    builder_snappy.apply_accessibility_settings(sensitivity=1.0, smoothing_multiplier=0.3)
+    source_snappy = SimulatedHandInputSource()
+    source_snappy.set_hand("Right", present=True, position=(0.5, 0.5))
+    _settle_hand_present(builder_snappy, source_snappy, frames=60)
+    source_snappy.move_hand("Right", (0.8, 0.5))
+    intent_snappy = _settle_hand_present(builder_snappy, source_snappy, frames=5)
+
+    # After the same short number of frames following the move, less
+    # smoothing (snappy) should have traveled further toward the new
+    # target than more smoothing.
+    x_smooth, _ = intent_smooth.right.position
+    x_snappy, _ = intent_snappy.right.position
+    assert abs(x_snappy - 0.5) > abs(x_smooth - 0.5)

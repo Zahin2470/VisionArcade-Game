@@ -14,6 +14,7 @@ for every game.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Callable, Dict, List, Optional, Tuple
 
 import pygame
@@ -31,13 +32,17 @@ from visionarcade.constants import GAME_METADATA
 from visionarcade.persistence.profiles import PlayerProfile, save_profile
 from visionarcade.persistence.scores import ScoresStore, save_scores
 from visionarcade.persistence.settings import Settings, save_settings
+from visionarcade.rendering.share_card import generate_share_card
 from visionarcade.rendering.themes import Theme, get_theme
+from visionarcade.rendering.transitions import FadeTransition
 from visionarcade.rendering.typography import Typography
 from visionarcade.ui.calibration import CalibrationScreen
 from visionarcade.ui.home import HomeScreen
 from visionarcade.ui.pause import PauseScreen
 from visionarcade.ui.results import ResultsScreen
 from visionarcade.ui.settings import SettingsScreen
+from visionarcade.utils.paths import get_user_data_dir
+from visionarcade.ui.tutorial import TutorialScreen
 from visionarcade.vision.calibration import CalibrationData, save_calibration
 from visionarcade.vision.gestures import FrameIntent, PinchState
 from visionarcade.vision.landmarks import HandResult
@@ -49,13 +54,13 @@ Point = Tuple[float, float]
 #: Maps a game id to a factory building a fresh `ArcadeGame` instance.
 #: Games without an entry here fall back to a "coming soon" placeholder
 #: — this is the one line Phases 5-8 each add to register their game.
-GameFactory = Callable[[int, int, Theme, Typography], ArcadeGame]
+GameFactory = Callable[[int, int, Theme, Typography, bool], ArcadeGame]
 GAME_FACTORIES: Dict[str, GameFactory] = {
-    "catch": lambda w, h, theme, typography: CatchGame(w, h, theme, typography),
-    "pong": lambda w, h, theme, typography: PongGame(w, h, theme, typography),
-    "slice": lambda w, h, theme, typography: SliceGame(w, h, theme, typography),
-    "aim": lambda w, h, theme, typography: AimGame(w, h, theme, typography),
-    "puzzle": lambda w, h, theme, typography: PuzzleGame(w, h, theme, typography),
+    "catch": lambda w, h, theme, typography, reduced_particles: CatchGame(w, h, theme, typography, reduced_particles=reduced_particles),
+    "pong": lambda w, h, theme, typography, reduced_particles: PongGame(w, h, theme, typography, reduced_particles=reduced_particles),
+    "slice": lambda w, h, theme, typography, reduced_particles: SliceGame(w, h, theme, typography, reduced_particles=reduced_particles),
+    "aim": lambda w, h, theme, typography, reduced_particles: AimGame(w, h, theme, typography, reduced_particles=reduced_particles),
+    "puzzle": lambda w, h, theme, typography, reduced_particles: PuzzleGame(w, h, theme, typography, reduced_particles=reduced_particles),
 }
 
 
@@ -98,8 +103,10 @@ class ArcadeManager:
         self.home_screen = HomeScreen(width, height, scores, profile)
         self.settings_screen = SettingsScreen(width, height, settings)
         self.calibration_screen = CalibrationScreen(width, height)
+        self.tutorial_screen = TutorialScreen(width, height)
         self.pause_screen = PauseScreen(width, height)
         self.results_screen = ResultsScreen(width, height)
+        self._transition = FadeTransition(width, height)
 
         self.audio.apply_settings(
             settings.master_volume, settings.sfx_volume, settings.music_volume, settings.muted
@@ -127,18 +134,26 @@ class ArcadeManager:
             pointer = (primary.index_tip[0] * self.width, primary.index_tip[1] * self.height)
         confirm = primary.pinch_state == PinchState.START
 
+        state_before = self.state
+
         if self.state == ArcadeState.HOME:
             self._update_home(dt, pointer, confirm, key_events)
         elif self.state == ArcadeState.SETTINGS:
             self._update_settings(dt, pointer, confirm, key_events)
         elif self.state == ArcadeState.CALIBRATION:
             self._update_calibration(dt, raw_hand_results, pointer, confirm, key_events)
+        elif self.state == ArcadeState.TUTORIAL:
+            self._update_tutorial(dt, pointer, confirm, key_events)
         elif self.state == ArcadeState.PLAYING:
             self._update_playing(dt, intent, confirm, key_events)
         elif self.state == ArcadeState.PAUSED:
             self._update_paused(dt, pointer, confirm, key_events)
         elif self.state == ArcadeState.RESULTS:
             self._update_results(dt, pointer, confirm, key_events)
+
+        if self.state != state_before:
+            self._transition.start()
+        self._transition.update(dt)
 
     # --- Home --------------------------------------------------------------
 
@@ -154,6 +169,9 @@ class ArcadeManager:
         elif result == "calibration":
             self.calibration_screen.on_enter()
             self.state = ArcadeState.CALIBRATION
+        elif result == "tutorial":
+            self.tutorial_screen.on_enter()
+            self.state = ArcadeState.TUTORIAL
         elif result.startswith("play:"):
             self._start_game(result.split(":", 1)[1])
 
@@ -166,7 +184,7 @@ class ArcadeManager:
         factory = GAME_FACTORIES.get(game_id or "")
         if factory is None:
             return None
-        return factory(self.width, self.height, self.theme, self.typography)
+        return factory(self.width, self.height, self.theme, self.typography, self.settings.reduced_particles)
 
     def _active_game_title(self) -> str:
         if self.active_game is not None:
@@ -191,6 +209,13 @@ class ArcadeManager:
                 self.settings.muted,
             )
             self.home_screen.refresh(self.scores, self.profile)
+            self.state = ArcadeState.HOME
+
+    # --- Tutorial ------------------------------------------------------------
+
+    def _update_tutorial(self, dt, pointer, confirm, key_events) -> None:
+        result = self.tutorial_screen.update(dt, pointer, confirm, key_events)
+        if result == "back":
             self.state = ArcadeState.HOME
 
     # --- Calibration ---------------------------------------------------------
@@ -264,10 +289,23 @@ class ArcadeManager:
         if result == "play_again":
             self.active_game = self._instantiate_game(self.active_game_id)
             self.state = ArcadeState.PLAYING
+        elif result == "save_share_card":
+            self._save_share_card()
         elif result == "back_to_hub":
             self.active_game = None
             self.active_game_id = None
             self.state = ArcadeState.HOME
+
+    def _save_share_card(self) -> None:
+        results = self.results_screen.results
+        game_title = self._active_game_title()
+        timestamp = int(time.time())
+        game_id = results.get("game_id", self.active_game_id or "game")
+        output_path = get_user_data_dir() / "share_cards" / f"{game_id}_{timestamp}.png"
+        if generate_share_card(game_title, results, output_path):
+            self.results_screen.show_message(f"Saved: {output_path.name}")
+        else:
+            self.results_screen.show_message("Couldn't save share card")
 
     def _record_current_game_progress(self) -> None:
         """Save an in-progress round's score when the player quits to
@@ -290,6 +328,8 @@ class ArcadeManager:
             self.settings_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.CALIBRATION:
             self.calibration_screen.draw(surface, self.typography, theme)
+        elif self.state == ArcadeState.TUTORIAL:
+            self.tutorial_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.PLAYING:
             self._draw_playing(surface, theme)
         elif self.state == ArcadeState.PAUSED:
@@ -297,6 +337,8 @@ class ArcadeManager:
             self.pause_screen.draw(surface, self.typography, theme)
         elif self.state == ArcadeState.RESULTS:
             self.results_screen.draw(surface, self.typography, theme, game_title=self._active_game_title())
+
+        self._transition.draw(surface)
 
     def _draw_playing(self, surface: pygame.Surface, theme: Theme) -> None:
         if self.active_game is not None:

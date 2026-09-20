@@ -34,9 +34,14 @@ class Particle:
 class ParticleSystem:
     """A simple, capped set of short-lived particles."""
 
-    def __init__(self, rng: Optional[random.Random] = None) -> None:
+    def __init__(self, rng: Optional[random.Random] = None, reduced: bool = False) -> None:
         self._rng = rng if rng is not None else random.Random()
         self._particles: List[Particle] = []
+        #: The player's "reduced particles" accessibility setting —
+        #: scales down (rather than eliminating) burst sizes, so the
+        #: feedback a burst gives is still present, just less visually
+        #: busy.
+        self._reduced = reduced
 
     @property
     def count(self) -> int:
@@ -53,7 +58,8 @@ class ParticleSystem:
         radius_range: Tuple[float, float] = (2.0, 5.0),
     ) -> None:
         """Spawn `count` particles radiating outward from (x, y)."""
-        for _ in range(count):
+        effective_count = max(1, int(count * 0.35)) if self._reduced else count
+        for _ in range(effective_count):
             angle = self._rng.uniform(0.0, 2.0 * math.pi)
             speed = self._rng.uniform(*speed_range)
             vx, vy = math.cos(angle) * speed, math.sin(angle) * speed

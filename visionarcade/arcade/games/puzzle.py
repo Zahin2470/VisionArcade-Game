@@ -118,6 +118,7 @@ class PuzzleGame(ArcadeGame):
         theme: Theme,
         typography: Typography,
         rng: Optional[random.Random] = None,
+        reduced_particles: bool = False,
     ) -> None:
         self.width = width
         self.height = height
@@ -126,7 +127,7 @@ class PuzzleGame(ArcadeGame):
         self._rng = rng if rng is not None else random.Random()
 
         self.play_area = pygame.Rect(40, 120, width - 80, height - 160)
-        self.particles = ParticleSystem(rng=self._rng)
+        self.particles = ParticleSystem(rng=self._rng, reduced=reduced_particles)
         self._time_curve = DifficultyCurve(
             PUZZLE_STAGE_TIME_START, PUZZLE_STAGE_TIME_END, max(1, PUZZLE_STAGE_COUNT - 1)
         )

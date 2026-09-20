@@ -23,7 +23,7 @@ from visionarcade.ui.navigation import FocusGroup, SelectableItem
 
 Point = Tuple[float, float]
 
-_ACTION_LABELS = {"settings": "Settings", "calibration": "Calibrate", "quit": "Quit"}
+_ACTION_LABELS = {"settings": "Settings", "calibration": "Calibrate", "tutorial": "Tutorial", "quit": "Quit"}
 
 
 class HomeScreen:
@@ -62,7 +62,7 @@ class HomeScreen:
             items.append(SelectableItem(item_id=f"play:{game_id}", rect=rect))
 
         button_width, button_gap = 180, 24
-        button_ids = ("settings", "calibration", "quit")
+        button_ids = ("settings", "calibration", "tutorial", "quit")
         total_buttons_width = len(button_ids) * button_width + (len(button_ids) - 1) * button_gap
         button_start_x = max(20, (self.width - total_buttons_width) // 2)
         self._button_top = self._card_top + GAME_CARD_HEIGHT + 50
@@ -140,8 +140,8 @@ class HomeScreen:
         typography.render(
             surface, title, "heading", theme.text_primary, center=(item.rect.centerx, item.rect.y + 36)
         )
-        self._draw_wrapped_text(
-            surface, typography, description, theme.text_secondary, item.rect, top=item.rect.y + 76
+        typography.render_wrapped(
+            surface, description, "small", theme.text_secondary, item.rect, top=item.rect.y + 76
         )
         typography.render(
             surface,
@@ -153,25 +153,3 @@ class HomeScreen:
         typography.render(
             surface, best_text, "small", theme.accent, center=(item.rect.centerx, item.rect.bottom - 22)
         )
-
-    @staticmethod
-    def _draw_wrapped_text(surface, typography, text, color, rect, top, line_height=20):
-        max_width = rect.width - 24
-        words = text.split(" ")
-        lines: List[str] = []
-        current = ""
-        for word in words:
-            candidate = f"{current} {word}".strip()
-            if typography.measure(candidate, "small")[0] <= max_width:
-                current = candidate
-            else:
-                if current:
-                    lines.append(current)
-                current = word
-        if current:
-            lines.append(current)
-
-        y = top
-        for line in lines:
-            typography.render(surface, line, "small", color, center=(rect.centerx, y))
-            y += line_height

@@ -4,78 +4,67 @@ A completely touchless, computer-vision-controlled arcade — played entirely
 through webcam-tracked hand gestures, no mouse or touchscreen required
 during gameplay.
 
-> **Status: Phase 8 of 10 — all 5 minimum-required mini-games are now
-> complete and fully playable.** This README is a working placeholder.
-> The full project overview, gesture/control tables, game
-> descriptions, screenshots, and troubleshooting guide are written in
-> Phase 10 once every system exists to document.
+> **Status: Phase 9 of 10 (polish and accessibility).** This README is
+> a working placeholder. The full project overview, gesture/control
+> tables, game descriptions, screenshots, and troubleshooting guide
+> are written in Phase 10.
 
 ## What exists right now
 
-**Phase 1 — skeleton:** package structure, CLI/config, camera service,
-MediaPipe Tasks-based hand tracker, base renderer, asset manager.
+**Phases 1-8:** the full vision pipeline (camera → hand tracking →
+gesture/intent), the arcade shell (home hub, settings, calibration,
+pause, results, persistence, audio, themes), and all 5 minimum-required
+mini-games — Catch, Pong, Slice, Aim, and Puzzle — fully playable.
 
-**Phase 2 — gesture/intent layer:** stateless feature extraction,
-frame-rate-independent smoothing, swipe/velocity detection, a
-debounced pinch state machine, `IntentBuilder`, calibration, and a
-keyboard-drivable hand simulator for Developer Mode and tests.
+**Phase 9 — polish and accessibility:**
+- **A real accessibility bug fixed, not just polish:** the Settings
+  screen's sensitivity, smoothing, and reduced-particles controls
+  existed and were adjustable — but did nothing. They're now wired
+  into the actual gesture pipeline and every game's particle system:
+  - `sensitivity` scales how far a physical hand movement translates
+    into on-screen movement (amplifies for limited range of motion,
+    dampens for finer control)
+  - `smoothing` scales the gesture pipeline's smoothing time constant
+    live, without resetting tracking state (no visible jump when you
+    adjust it)
+  - `reduced_particles` scales down (not eliminates) every game's
+    particle burst sizes
+- **A Tutorial screen** (`ui/tutorial.py`) — previously a stub with
+  zero implementation, despite the hub's own design calling for a
+  "help/tutorial" entry. Now a real screen explaining all five core
+  gestures (move/point, pinch, open palm, fist, swipe) with simple
+  icons, reachable from a new hub button
+- **Screen transitions** — a brief fade applied automatically by the
+  shell on every state change (Home → Settings, entering a game,
+  reaching Results, etc.), so no individual screen needs transition
+  logic of its own
+- **Share cards** — Pillow (declared as a dependency since Phase 1,
+  unused until now) generates a PNG summary of a completed round
+  (score, outcome, best streak, etc.) via a new "Save Share Card"
+  button on the Results screen, saved locally
+- A debug-only FPS/frame-time readout, never shown to a normal player
 
-**Phase 3 — arcade shell:** persisted settings/scores/profile (all
-tolerant of corrupted files), an audio manager, themes/typography, a
-shared keyboard-or-touchless `FocusGroup` navigation primitive, the
-home hub, settings screen, and calibration screen — plus the
-`ArcadeGame` interface every mini-game implements.
+**Deliberately scoped down, with reasoning:** the master prompt's full
+"camera presentation" section (a live, letterboxed camera view with
+vignette, tracked-hand overlay, gesture label, and confidence
+indicator on the calibration screen and a debug preview panel during
+gameplay) was not built this phase. It's a substantial, genuinely
+useful feature, but attempting it with the remaining time in this
+phase risked shipping something under-tested. Rather than rush it, I
+left it out and am flagging it here plainly so it isn't mistaken for
+an oversight — it's a good candidate for Phase 10 if there's room, or
+a documented known gap in the final acceptance pass.
 
-**Phase 4 — Vision Catch:** shared collision/scoring/difficulty/input
-helpers, a particle system, a reusable HUD, and the first fully
-playable game — plus generic Pause and Results screens shared by every
-game.
-
-**Phase 5 — Vision Pong:** a touchless in-game mode-select menu
-(1-player vs AI, or 2-player), a beatable AI opponent, and two-layer
-ball acceleration (match-long ramp plus per-rally speedup).
-
-**Phase 6 — Vision Slice:** trajectory-based swipe collision
-(`segment_circle_intersect`), targets that arc under gravity, three
-target categories, a fast-decaying chain multiplier, a fading blade
-trail, and rotating shard effects on every cut.
-
-**Phase 7 — Vision Aim:** a hover-aware reticle, a 20-target sequence
-with a per-target time limit that tightens as it progresses, scoring
-that rewards both speed and accuracy, and a miss budget that gives a
-lives-free game genuine win/loss stakes.
-
-**Phase 8 — Vision Puzzle (the fifth and final required game):**
-- Pinch to grab a piece, drag it, release it on the matching
-  shape-and-color slot — five distinct shapes (circle, triangle,
-  square, diamond, pentagon), each with its own color, so pieces are
-  never ambiguous
-- Both hands work independently and simultaneously — grabbing and
-  placing two pieces at once (one per hand) is just something a player
-  can choose to do, not a separate mode to toggle
-- Three stages, each with more pieces *and* less time than the last —
-  a genuine difficulty ramp indexed by stage rather than wall-clock time
-- Wrist/hand-orientation rotation (one of the spec's suggested
-  "advanced" options, explicitly marked "if robust") was deliberately
-  **not** built: our stabilized `HandIntent` has no orientation
-  signal, and adding one would mean extending the whole vision
-  pipeline for a single optional feature. Shape+color matching is a
-  complete puzzle without it — documented in the game's own docstring
-  rather than silently dropped
-
-Test suite (`tests/`) covers all of the above — 477 tests, including
-end-to-end tests that play real rounds of all five games through the
-actual app loop, nothing mocked below the OS event queue.
+Test suite (`tests/`) covers all of the above — 509 tests.
 
 ## Quick start
 
 ```bash
 pip install -r requirements.txt
-python main.py                # launch: all 5 games are fully playable
-python main.py --debug        # verbose logging + on-screen intent debug text
+python main.py                # launch: all 5 games playable, tutorial available from the hub
+python main.py --debug        # verbose logging + on-screen intent/FPS debug text
 python main.py --simulate --debug
-    # keyboard-controlled hand: arrow keys move it, space pinches —
-    # play any game without a webcam
+    # keyboard-controlled hand: arrow keys move it, space pinches
 ```
 
 ## Running tests
@@ -85,9 +74,8 @@ pytest
 ```
 
 Tests run headless via pygame's dummy video/audio drivers. Anything
-involving randomness (spawn/launch timing, target/piece placement, AI
-aim error, particle bursts) is seeded via an injected `random.Random`,
-so gameplay tests are fully deterministic.
+involving randomness is seeded via an injected `random.Random`, so
+gameplay tests are fully deterministic.
 
 ## A note on MediaPipe
 
@@ -100,9 +88,8 @@ gracefully (no crash) if that download ever fails.
 
 ## Roadmap
 
-With all 5 games playable, what's left is polish and packaging:
-particle variety, transitions, a full accessibility pass (Phase 9),
-then full documentation and packaging (Phase 10) — README overhaul
-with gesture/control tables and screenshots, a proper project
-structure writeup, and a final acceptance pass against every
-requirement in the original design brief.
+Phase 10: full documentation and packaging — a real README with
+gesture/control tables and screenshots, a final acceptance pass against
+every requirement in the original design brief (including an explicit
+note on the deferred camera-presentation feature above), and general
+release readiness.

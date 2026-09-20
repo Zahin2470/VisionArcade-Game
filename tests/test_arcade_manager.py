@@ -33,6 +33,7 @@ def isolated_user_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr("visionarcade.persistence.scores.get_user_data_dir", lambda: tmp_path)
     monkeypatch.setattr("visionarcade.persistence.profiles.get_user_data_dir", lambda: tmp_path)
     monkeypatch.setattr("visionarcade.vision.calibration.get_user_data_dir", lambda: tmp_path)
+    monkeypatch.setattr("visionarcade.arcade.manager.get_user_data_dir", lambda: tmp_path)
     return tmp_path
 
 
@@ -121,6 +122,18 @@ def test_navigating_to_calibration_and_skipping_returns_home(isolated_user_data_
     assert manager.state == ArcadeState.HOME
 
 
+def test_navigating_to_tutorial_and_back_returns_home(isolated_user_data_dir):
+    manager = _manager()
+    tutorial_item = next(i for i in manager.home_screen._focus.items if i.item_id == "tutorial")
+    pointer = _normalized(tutorial_item.rect.center)
+    manager.update(_intent_with_pointer(*pointer), [], [], DT)
+    manager.update(_intent_with_pointer(*pointer, pinch=PinchState.START), [], [], DT)
+    assert manager.state == ArcadeState.TUTORIAL
+
+    manager.update(_empty_intent(), [], [pygame.K_ESCAPE], DT)
+    assert manager.state == ArcadeState.HOME
+
+
 def test_selecting_a_game_enters_playing_placeholder(isolated_user_data_dir):
     manager = _manager()
     game_id = KNOWN_GAMES[0]
@@ -171,6 +184,24 @@ def test_high_contrast_forces_mono_theme():
     manager = _manager()
     manager.settings = manager.settings.with_overrides(high_contrast=True, theme="neon")
     assert manager.theme.name == "mono"
+
+
+def test_save_share_card_from_results_writes_a_file_and_shows_a_message(isolated_user_data_dir):
+    manager = _manager()
+    manager._start_game("catch")
+    manager.active_game._phase = _CatchPhase.PLAYING
+    manager.active_game._lives = 0
+    manager.active_game._objects = []
+    manager.update(_empty_intent(), [], [], DT)  # -> RESULTS
+    assert manager.state == ArcadeState.RESULTS
+
+    manager.update(_empty_intent(), [], [pygame.K_RIGHT], DT)  # focus Save Share Card
+    manager.update(_empty_intent(), [], [pygame.K_RETURN], DT)
+
+    assert manager.results_screen._message_timer > 0
+    share_cards_dir = isolated_user_data_dir / "share_cards"
+    assert share_cards_dir.exists()
+    assert any(share_cards_dir.iterdir())
 
 
 def test_shutdown_persists_settings_scores_and_profile(isolated_user_data_dir):

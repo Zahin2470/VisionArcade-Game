@@ -160,6 +160,11 @@ class VisionArcadeApp:
         window_open, key_events = self.renderer.pump_events()
 
         hand_results = self._collect_hand_results(dt)
+        if self.arcade_manager is not None:
+            self.intent_builder.apply_accessibility_settings(
+                self.arcade_manager.settings.sensitivity,
+                self.arcade_manager.settings.smoothing_multiplier,
+            )
         self.latest_intent = self.intent_builder.update(hand_results, dt)
         self.arcade_manager.update(self.latest_intent, hand_results, key_events, dt)
 
@@ -210,8 +215,10 @@ class VisionArcadeApp:
     def _render_frame(self) -> None:
         self.arcade_manager.draw(self.renderer.surface)
 
-        if self.config.debug and self.latest_intent is not None:
-            self._draw_debug_intent_text(self.latest_intent)
+        if self.config.debug:
+            if self.latest_intent is not None:
+                self._draw_debug_intent_text(self.latest_intent)
+            self._draw_debug_fps_text()
 
         self.renderer.present()
 
@@ -228,6 +235,17 @@ class VisionArcadeApp:
             )
         debug_center = (self.renderer.width // 2, self.renderer.height - 16)
         self.renderer.draw_placeholder_text(line, color=(120, 220, 160), center=debug_center)
+
+    def _draw_debug_fps_text(self) -> None:
+        """A debug-only FPS/frame-time readout — never shown to a
+        normal player, per the project's performance requirements."""
+        if self._clock is None:
+            return
+        fps = self._clock.get_fps()
+        frame_ms = (1000.0 / fps) if fps > 0 else 0.0
+        line = f"FPS: {fps:0.0f}  ({frame_ms:0.1f} ms/frame)"
+        fps_center = (self.renderer.width - 90, self.renderer.height - 16)
+        self.renderer.draw_placeholder_text(line, color=(200, 200, 120), center=fps_center)
 
     def shutdown(self) -> None:
         """Persist state and release the camera, tracker, and window."""

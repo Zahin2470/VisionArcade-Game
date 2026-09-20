@@ -83,6 +83,13 @@ class PointSmoother:
     def update(self, point: Point, dt: float) -> Point:
         return (self._x.update(point[0], dt), self._y.update(point[1], dt))
 
+    def set_time_constant(self, time_constant: float) -> None:
+        """Change how much smoothing is applied going forward, without
+        resetting the smoother's current value (no visible jump) —
+        used to apply the player's "smoothing" accessibility setting."""
+        self._x.time_constant = time_constant
+        self._y.time_constant = time_constant
+
 
 class HysteresisGate:
     """Requires N consecutive confirmations before flipping a boolean state.

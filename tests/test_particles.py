@@ -69,3 +69,23 @@ def test_seeded_rng_is_reproducible():
     positions_a = [(p.vx, p.vy) for p in system_a._particles]
     positions_b = [(p.vx, p.vy) for p in system_b._particles]
     assert positions_a == positions_b
+
+
+# --- Reduced-particles accessibility mode (Phase 9) --------------------------
+
+def test_reduced_mode_produces_fewer_particles():
+    system = ParticleSystem(rng=random.Random(1), reduced=True)
+    system.burst(0, 0, (255, 0, 0), count=20)
+    assert system.count < 20
+
+
+def test_normal_mode_produces_the_full_requested_count():
+    system = ParticleSystem(rng=random.Random(1), reduced=False)
+    system.burst(0, 0, (255, 0, 0), count=20)
+    assert system.count == 20
+
+
+def test_reduced_mode_never_produces_zero_particles():
+    system = ParticleSystem(rng=random.Random(1), reduced=True)
+    system.burst(0, 0, (255, 0, 0), count=1)
+    assert system.count >= 1

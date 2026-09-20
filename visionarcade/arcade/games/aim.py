@@ -65,6 +65,7 @@ class AimGame(ArcadeGame):
         theme: Theme,
         typography: Typography,
         rng: Optional[random.Random] = None,
+        reduced_particles: bool = False,
     ) -> None:
         self.width = width
         self.height = height
@@ -73,7 +74,7 @@ class AimGame(ArcadeGame):
         self._rng = rng if rng is not None else random.Random()
 
         self.play_area = pygame.Rect(40, 120, width - 80, height - 200)
-        self.particles = ParticleSystem(rng=self._rng)
+        self.particles = ParticleSystem(rng=self._rng, reduced=reduced_particles)
 
         self._time_limit_curve = DifficultyCurve(
             AIM_TIME_LIMIT_START, AIM_TIME_LIMIT_END, AIM_DIFFICULTY_RAMP_TARGETS

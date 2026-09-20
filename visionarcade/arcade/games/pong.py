@@ -86,6 +86,7 @@ class PongGame(ArcadeGame):
         typography: Typography,
         rng: Optional[random.Random] = None,
         points_to_win: int = PONG_POINTS_TO_WIN,
+        reduced_particles: bool = False,
     ) -> None:
         self.width = width
         self.height = height
@@ -95,7 +96,7 @@ class PongGame(ArcadeGame):
         self._points_to_win = points_to_win
 
         self.play_area = pygame.Rect(40, 110, width - 80, height - 170)
-        self.particles = ParticleSystem(rng=self._rng)
+        self.particles = ParticleSystem(rng=self._rng, reduced=reduced_particles)
 
         self._mode_focus = FocusGroup()
         self._layout_mode_select()

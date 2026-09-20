@@ -65,5 +65,39 @@ class Typography:
         without drawing it — useful for layout."""
         return self._font(size_name).size(text)
 
+    def render_wrapped(
+        self,
+        surface: pygame.Surface,
+        text: str,
+        size_name: str,
+        color: Color,
+        rect: "pygame.Rect",
+        top: int,
+        line_height: int = 20,
+    ) -> None:
+        """Word-wrap `text` to fit within `rect`'s width (minus a small
+        margin) and render it centered horizontally, starting at `top`.
+        Shared by any screen that needs to fit a description into a
+        fixed-width card rather than reimplementing wrapping."""
+        max_width = rect.width - 24
+        words = text.split(" ")
+        lines = []
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if self.measure(candidate, size_name)[0] <= max_width:
+                current = candidate
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+
+        y = top
+        for line in lines:
+            self.render(surface, line, size_name, color, center=(rect.centerx, y))
+            y += line_height
+
     def clear_cache(self) -> None:
         self._fonts.clear()

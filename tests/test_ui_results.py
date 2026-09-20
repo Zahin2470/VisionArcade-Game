@@ -34,10 +34,11 @@ def test_enter_key_activates_first_focused_button():
     assert result == "play_again"
 
 
-def test_right_then_enter_activates_back_to_hub():
+def test_navigating_to_last_button_activates_back_to_hub():
     screen = ResultsScreen(1280, 720)
     screen.on_enter(_RESULTS, is_new_best=False)
-    screen.update(DT, None, False, [pygame.K_RIGHT])
+    for _ in range(len(screen._focus.items) - 1):
+        screen.update(DT, None, False, [pygame.K_RIGHT])
     result = screen.update(DT, None, False, [pygame.K_RETURN])
     assert result == "back_to_hub"
 
@@ -56,6 +57,33 @@ def test_pointer_confirm_activates_hovered_button():
     screen.update(DT, play_again_item.rect.center, False, [])
     result = screen.update(DT, play_again_item.rect.center, True, [])
     assert result == "play_again"
+
+
+def test_save_share_card_button_returns_its_action_id():
+    screen = ResultsScreen(1280, 720)
+    screen.on_enter(_RESULTS, is_new_best=False)
+    screen.update(DT, None, False, [pygame.K_RIGHT])  # focus save_share_card (2nd item)
+    result = screen.update(DT, None, False, [pygame.K_RETURN])
+    assert result == "save_share_card"
+
+
+def test_show_message_displays_and_expires():
+    screen = ResultsScreen(1280, 720)
+    screen.on_enter(_RESULTS, is_new_best=False)
+    screen.show_message("Saved: test.png")
+    assert screen._message_timer > 0
+    for _ in range(1000):
+        screen.update(DT, None, False, [])
+        if screen._message_timer <= 0:
+            break
+    assert screen._message_timer == 0.0
+
+
+def test_draw_with_active_message_does_not_raise(renderer):
+    screen = ResultsScreen(renderer.surface.get_width(), renderer.surface.get_height())
+    screen.on_enter(_RESULTS, is_new_best=False)
+    screen.show_message("Saved: test.png")
+    screen.draw(renderer.surface, Typography(), get_theme("dark"))
 
 
 def test_draw_does_not_raise_for_cleared_outcome(renderer):
