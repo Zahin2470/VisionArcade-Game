@@ -10,7 +10,7 @@ from __future__ import annotations
 
 # --- Application ---------------------------------------------------------
 APP_NAME: str = "VisionArcade"
-APP_VERSION: str = "0.1.0-phase1"
+APP_VERSION: str = "1.0.0"
 
 # --- Window / rendering ---------------------------------------------------
 DEFAULT_WINDOW_WIDTH: int = 1280

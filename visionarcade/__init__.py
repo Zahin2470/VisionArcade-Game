@@ -17,8 +17,8 @@ persistence, or audio systems:
     └── utils/             Paths, assets, shared helpers
 
 Phase 1 implements the skeleton, configuration, camera service, hand
-tracker, base renderer, and asset manager. Everything else is stubbed
-with clear placeholders until its corresponding development phase.
+tracker, base renderer, and asset manager. Everything else is stabilized
+by Phase 9, and all 5 minimum-required games are complete and playable.
 """
 
-__version__ = "0.1.0-phase1"
+__version__ = "1.0.0"
